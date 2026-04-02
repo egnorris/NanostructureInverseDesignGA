@@ -18,10 +18,11 @@ def getkwarg(kwargs, default, keywords):
   #print(f"Default {keywords[0]}: {default}")
   return default
 
-def closestRadius(r, r0=40, r1=80, p=8):
-  radiusRange = np.linspace(r0, r1, 2**p)
+def getCoding(rMin, rMax, p):
+  return np.linspace(rMin, rMax, 2**p)
+
+def closestRadius(r, rMin, rMax, p):
+  radiusRange = getCoding(rMin, rMax, p)
   idx = np.argmin(np.abs(radiusRange - r))
   rMatch = radiusRange[idx]
-  #print(f"Current Radial Value: {r}")
-  #print(f"New Radial Value: {rMatch}")
   return rMatch

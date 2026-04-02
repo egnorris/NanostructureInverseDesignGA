@@ -15,7 +15,7 @@ keywords = {
 def getkwarg(kwargs, default, keywords):
   for i in range(len(keywords)):
     if f"{keywords[i]}" in kwargs:
-      print(f"{keywords[0]}: {kwargs[keywords[i]]}")
+      #print(f"{keywords[0]}: {kwargs[keywords[i]]}")
       return kwargs[keywords[i]]
   #print(f"Default {keywords[0]}: {default}")
   return default

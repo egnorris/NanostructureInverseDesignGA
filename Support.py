@@ -1,6 +1,16 @@
 import numpy as np
 
-defaultKwargs = {"rMin": 20, "rMax": 75, "d": (180,180), "s": 5, "p": 12, "mR":0.1, "cP":2}
+defaultKwargs = {
+  "rMin": 20,
+  "rMax": 75,
+  "d": (180,180),
+  "s": 5,
+  "p": 12,
+  "mR":0.1,
+  "cP":2,
+  "l":[1,2,2],
+  "m":[1,1,2],
+  "f":["E", "H"]}
 
 keywords = {
     "rMin":["rMin", "minR", "r0", "minimumR", "rMinimum", "minimumRadius"],
@@ -10,6 +20,9 @@ keywords = {
     "p":["precision", "p", "binaryPrecision"],
     "mR": ["mR", "mutationRate", "mutR", "mutRate"],
     "cP": ["cP", "crossoverPoints", "crossPoints"],
+    "l": ["l", "degree"],
+    "m": ["m", "order"],
+    "f": ["f", "fields"],
     }
 
 def getkwarg(kwargs, default, keywords):

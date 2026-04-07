@@ -202,6 +202,46 @@ class ProfileGeneration():
       temp = self.binaryPolygon[self.p*i: (self.p*i+self.p)]
       self.decodedPolygon[i] = self.__decodeRadius(temp)
 
+  def decodeChromosome(self, chromosome):
+    self.binaryPolygon = chromosome
+    self.decodePolygon()
+    self.r = self.decodedPolygon
+    self.arrayConversion()
+
+  def generate(self, generator=None):
+    if generator == None:
+      x = np.random.randint(4)
+      if x == 0:
+        self.triangleGenerator()
+      elif x == 1:
+        self.rectangleGenerator()
+      elif x == 2:
+        self.circleGenerator()
+      else:
+        self.fourierGenerator(np.random.randint(2,4))
+
+    elif generator == 'tri':
+      self.triangleGenerator()
+    elif generator == 'rec':
+      self.rectangleGenerator()
+    elif generator == 'cir':
+      self.circleGenerator()
+    elif generator == 'pol':
+      self.polygonGenerator()
+    else:
+      self.fourierGenerator(np.random.randint(2,4))
+
+    self.arrayConversion()
+    self.encodePolygon()
+
+
+
+
+    
+
+
+
+
   def testDecoder(self):
     #test polygonGenerator
     self.polygonGenerator()

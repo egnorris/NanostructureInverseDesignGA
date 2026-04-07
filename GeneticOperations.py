@@ -106,4 +106,8 @@ class GeneticOperations():
       c1Mut[idx] = np.abs(int(c1Mut[idx])-1)
     
     self.c0Mutated = ''.join(map(str,c0Mut))
-    self.c1Mutated = ''.join(map(str,c1Mut)) 
+    self.c1Mutated = ''.join(map(str,c1Mut))
+
+  def operate(self):
+    self.crossover()
+    self.mutate()

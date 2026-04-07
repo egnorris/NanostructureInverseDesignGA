@@ -85,8 +85,10 @@ class DeepLearning():
 
         self.wavelengths = np.linspace(300,800,101)
         self.multipolePredictions = np.zeros((len(self.models), nImages, len(self.wavelengths)))
+        self.scatteredPowerPredictions = np.zeros((nImages, len(self.wavelengths)))
         for k in range(len(self.models)):
             self.multipolePredictions[k, :, :] = self.models[k].predict(inputImages) ** 0.25
+            self.scatteredPowerPredictions[:,:] += np.abs(self.multipolePredictions[k, :, :])**2
 
 
 

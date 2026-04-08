@@ -1,10 +1,14 @@
 import Support
 import numpy as np
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 from tensorflow import keras
 global defaultKwargs
 global keywords
 defaultKwargs = Support.defaultKwargs
 keywords = Support.keywords
+
+
 
 class DeepLearning():
     def __init__(self, path, **kwargs):

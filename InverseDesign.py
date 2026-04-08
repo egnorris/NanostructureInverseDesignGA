@@ -64,7 +64,10 @@ class Population():
         #initialize population
         
         for k in range(self.nProfiles):
-            self.profGen.generate('cir')
+            if k < 3*self.nProfiles/4:
+                self.profGen.generate('cir')
+            else:
+                self.profGen.generate('tri')
             self.images[k, :, :] = self.profGen.smoothedImage
             self.chromosomes[k] = self.profGen.binaryPolygon
         self.dlModels.getModelPrediction(self.images)
@@ -80,90 +83,8 @@ class Population():
             for k in range(len(self.wavelengths)):
                 mse += np.sqrt((self.objective[k] - y[i,k])**2)
             mse = mse / len(self.wavelengths)
-            f[i] = 100*np.exp(-mse)
+            f[i] = 100*np.exp(-25*mse)
         return f
 
 
-    def selection(self, offspringFitness):
-        idxList = list(np.arange(len(offspringFitness)))
-        fitnessList = list(offspringFitness)
-        df = pd.DataFrame({"idx": idxList, "f":fitnessList})
-        idxList = df["idx"].tolist()
-        fitnessList = df["f"].tolist()
-
-        selectedIdx = []
-        selectedFitness = []
-
-        for i in range(self.nProfiles):
-            fitnessSum = np.sum(fitnessList)
-            selectionProbability = fitnessList / fitnessSum
-            x = np.random.rand()
-            s = 0
-            j = -1
-            while s <= x:
-                j += 1
-                s += selectionProbability[j]
-            selectedIdx.append(idxList[j])
-            selectedFitness.append(offspringFitness[idxList[j]])
-            df = df.drop(j)
-            idxList = df["idx"].tolist()
-            fitnessList = df["f"].tolist()
-            df = pd.DataFrame({"idx": idxList, "f":fitnessList})
-            idxList = df["idx"].tolist()
-            fitnessList = df["f"].tolist()
-        
-        df = pd.DataFrame({"idx": selectedIdx, "f":selectedFitness})
-        idxList = df["idx"].tolist()
-        fitnessList = df["f"].tolist()
-        return idxList
-
-
-
-        
-
-
-
-    def reproduction(self):
-        x = list(np.arange(self.nProfiles, dtype=np.uint8))
-        pairings = np.asarray(list(iter.combinations(x, 2)))
-        np.random.shuffle(pairings)
-        nOffspring = int(len(pairings)*0.25)
-        offspringChromosomes = np.zeros(2*nOffspring)
-        offspringChromosomes = list(offspringChromosomes)
-        offspringFitness = np.zeros(2*nOffspring)
-        offspringImages = np.zeros((2*nOffspring, self.dom[0], self.dom[1]))
-        offspringMultipoles = np.zeros((int(len(self.l)*len(self.f)), 2*nOffspring, len(self.wavelengths)))
-        offspringScatteredPower = np.zeros((2*nOffspring, 101))
-        
-        id0, id1 = pairings[0]
-        p0 = self.chromosomes[id0]; p1 = self.chromosomes[id1]
-        g = go.GeneticOperations(p0,p1,mR=self.mR,cP=self.cP)
-
-        
-
-        for n in range(nOffspring):
-            id0, id1 = pairings[n]
-            g.p0 = self.chromosomes[id0]; g.p1 = self.chromosomes[id1]
-            g.operate()
-            self.profGen.decodeChromosome(g.c0)
-            offspringImages[n, :, :] = self.profGen.smoothedImage
-            offspringChromosomes[n] = self.profGen.binaryPolygon
-
-            self.profGen.decodeChromosome(g.c1)
-            offspringImages[n+nOffspring, :, :] = self.profGen.smoothedImage
-            offspringChromosomes[n+nOffspring] = self.profGen.binaryPolygon
-            
-        self.dlModels.getModelPrediction(offspringImages)
-        offspringMultipoles = self.dlModels.multipolePredictions
-        offspringScatteredPower = self.dlModels.scatteredPowerPredictions
-        offspringFitness = self.getFitness(offspringImages, offspringScatteredPower)
-        
-        idxSelected = self.selection(offspringFitness)
-        print(idxSelected)
-        for n in range(self.nProfiles):
-            k = idxSelected[n]
-            self.chromosomes[n] = offspringChromosomes[k]
-            self.images[n, :, :] = offspringImages[k, :, :]
-            self.fitness[n] = offspringFitness[k]
-            self.multipoles[:,n,:] = offspringMultipoles[:,k,:]
-            self.scatteredPower[n,:] = offspringScatteredPower[k,:]
+    

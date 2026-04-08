@@ -15,7 +15,7 @@ keywords = Support.keywords
 
 
 def scale(x):
-    return 1/x
+    return np.exp(-0.01*x)
         
 
 class Population():
@@ -41,6 +41,7 @@ class Population():
         self.f = Support.getkwarg(kwargs, defaultKwargs["f"], keywords["f"])
         self.path = path
 
+        
         #setup population arrays
         self.chromosomes = np.zeros(nProfiles)
         self.chromosomes = list(self.chromosomes)
@@ -59,7 +60,7 @@ class Population():
         #setup objective
         if objective == None:
             temp = np.zeros((1, self.dom[0], self.dom[1]))
-            self.profGen.generate('pol')
+            self.profGen.generate('cir')
             self.objectivePoly = self.profGen.smoothedImage
             temp[0, :, :] = self.profGen.smoothedImage
             self.dlModels.getModelPrediction(temp)
@@ -72,9 +73,9 @@ class Population():
         
         for k in range(self.nProfiles):
             if k < self.nProfiles/2:
-                self.profGen.generate('tri')
+                self.profGen.generate('fou')
             else:
-                self.profGen.generate('cir')
+                self.profGen.generate('pol')
             self.images[k, :, :] = self.profGen.smoothedImage
             self.chromosomes[k] = self.profGen.binaryPolygon
         self.dlModels.getModelPrediction(self.images)
@@ -103,6 +104,16 @@ class Population():
                 relativeError[w] = absoluteError[w]/x[w]
                 meanSquaredError[w] = (x[w] - y[n,w])**2
                 rootMeanSquaredError[w] = (x[w] - y[n,w])**2
+                if np.isnan(distance[w]):
+                    distance[w] = 1000
+                if np.isnan(absoluteError[w]):
+                    absoluteError[w] = 1000
+                if np.isnan(relativeError[w]):
+                    relativeError[w] = 1000
+                if np.isnan(meanSquaredError[w]):
+                    meanSquaredError[w] = 1000
+                if np.isnan(rootMeanSquaredError[w]):
+                    rootMeanSquaredError[w] = 1000
 
             self.integral[n] = np.round(np.sum(distance), 5)
             self.meanAbsoluteError[n] = np.round(np.mean(absoluteError), 5)
@@ -176,17 +187,17 @@ class Population():
         for k in range(self.nGenerated):
             p0 = self.chromosomes[self.parentPairs[k, 0]]
             p1 = self.chromosomes[self.parentPairs[k, 1]]
-            g = go.GeneticOperations(p0, p1)
+            g = go.GeneticOperations(p0, p1, mR=self.mR, cP=self.cP)
             g.operate()
-            self.profGen.decodeChromosome(g.c0Mutated)
+            self.profGen.decodeChromosome(g.c0)
             i0 = self.profGen.smoothedImage
-            self.profGen.decodeChromosome(g.c1Mutated)
+            self.profGen.decodeChromosome(g.c1)
             i1 = self.profGen.smoothedImage
 
-            newChromosomes[n] = g.c0Mutated
+            newChromosomes[n] = g.c0
             newImages[n, :, :] = i0
             n += 1
-            newChromosomes[n] = g.c1Mutated
+            newChromosomes[n] = g.c1
             newImages[n, :, :] = i1
             n += 1
 

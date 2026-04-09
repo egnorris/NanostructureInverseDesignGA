@@ -5,6 +5,7 @@ import ProfileGeneration as pg
 import DeepLearning as dl
 import itertools as iter
 import pandas as pd
+import matplotlib.pyplot as plt
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 
@@ -19,11 +20,10 @@ def scale(x):
         
 
 class Population():
-    def __init__(self, nProfiles, nVertices, path, objective=None, **kwargs):
+    def __init__(self, nVertices, modelDirectory, **kwargs):
 
         #required Arguments
         self.nVertices = nVertices
-        self.nProfiles = nProfiles
 
         #Keyword Arguments
         #Profile Generation
@@ -39,9 +39,56 @@ class Population():
         self.l = Support.getkwarg(kwargs, defaultKwargs["l"], keywords["l"])
         self.m = Support.getkwarg(kwargs, defaultKwargs["m"], keywords["m"])
         self.f = Support.getkwarg(kwargs, defaultKwargs["f"], keywords["f"])
-        self.path = path
+        self.path = modelDirectory
 
+    
+        #add external classes for use later
+        self.profGen = pg.ProfileGeneration(self.nVertices,rMin=self.rMin,rMax=self.rMax,d=self.dom,s=self.s,p=self.p)
+        self.dlModels = dl.DeepLearning(self.path,l=self.l,m=self.m,f=self.f)
+        self.dlModels.loadModels()
+    
+    def defineObjective(self, profileType=None, spectrum=None, termsF=None):
+        if (profileType != None) and (spectrum == None):
+            temp = np.zeros((1, self.dom[0], self.dom[1]))
+            self.profGen.generate(profileType)
+            if profileType == 'fou':
+                if termsF == None:
+                    self.profGen.fourierGenerator(np.random.randint(2,5))
+                    self.profGen.arrayConversion()
+                    self.profGen.encodePolygon()
+                else:
+                    self.profGen.fourierGenerator(termsF)
+                    self.profGen.arrayConversion()
+                    self.profGen.encodePolygon()
+
+            temp[0, :, :] = self.profGen.smoothedImage
+            self.dlModels.getModelPrediction(temp)
+            self.objImage = self.profGen.smoothedImage
+            self.objScatteredPower = self.dlModels.scatteredPowerPredictions[0, :]
+        elif (profileType == None) and (spectrum != None):
+            if len(spectrum) == len(self.wavelengths):
+                self.objScatteredPower = spectrum
         
+        else:
+            raise Exception(f'Objective Spectrum cannot be defined')
+ 
+    def __displayTotals(self):
+        print("--------------------------------------------------------------------------")
+        print(f"Initial Generation Makeup")
+        print("--------------------------------------------------------------------------")
+        print(f"{self.nT} Triangles")
+        print(f"{self.nR} Rectangles")
+        print(f"{self.nC} Circles")
+        print(f"{self.nF} Fourier Series Polygons")
+        print(f"{self.nF} Randomized Polygons")
+        print(f"{self.nProfiles} Total Profiles")
+        
+
+    def initialize(self, nT=0, nR=0, nC=0, nF=0, nP=0, termsF = None):
+        #initialize population
+        nProfiles = nT + nR + nC + nF + nP
+        if nProfiles < 16:
+            raise Exception(f'Not enough profiles, nProfiles = nT + nR + nC + nF + nP should be at least 16')
         #setup population arrays
         self.chromosomes = np.zeros(nProfiles)
         self.chromosomes = list(self.chromosomes)
@@ -51,41 +98,59 @@ class Population():
         self.multipoles = np.zeros((int(len(self.l)*len(self.f)), nProfiles, len(self.wavelengths)))
         self.scatteredPower = np.zeros((nProfiles, 101))
 
-        #add external classes for use later
-        self.profGen = pg.ProfileGeneration(self.nVertices,rMin=self.rMin,rMax=self.rMax,d=self.dom,s=self.s,p=self.p)
-        self.dlModels = dl.DeepLearning(self.path,l=self.l,m=self.m,f=self.f)
-        self.dlModels.loadModels()
-        
+        self.nProfiles = nProfiles
+        self.nT = nT; self.nR = nR; self.nC = nC; self.nF = nF; self.nP = nP
 
-        #setup objective
-        if objective == None:
-            temp = np.zeros((1, self.dom[0], self.dom[1]))
+        n = 0
+        for k in range(nT):
+            self.profGen.generate('tri')
+            self.images[n, :, :] = self.profGen.smoothedImage
+            self.chromosomes[n] = self.profGen.binaryPolygon
+            n += 1
+        for k in range(nR):
+            self.profGen.generate('rec')
+            self.images[n, :, :] = self.profGen.smoothedImage
+            self.chromosomes[n] = self.profGen.binaryPolygon
+            n += 1
+        for k in range(nC):
             self.profGen.generate('cir')
-            self.objectivePoly = self.profGen.smoothedImage
-            temp[0, :, :] = self.profGen.smoothedImage
-            self.dlModels.getModelPrediction(temp)
-            objective = self.dlModels.scatteredPowerPredictions
-
-        self.objective = objective[0, :]
-
-
-        #initialize population
-        
-        for k in range(self.nProfiles):
-            if k < self.nProfiles/2:
-                self.profGen.generate('fou')
+            self.images[n, :, :] = self.profGen.smoothedImage
+            self.chromosomes[n] = self.profGen.binaryPolygon
+            n += 1
+        for k in range(nF):
+            if termsF == None:
+                self.profGen.fourierGenerator(np.random.randint(2,4))
+                self.profGen.arrayConversion()
+                self.profGen.encodePolygon()
+                self.images[n, :, :] = self.profGen.smoothedImage
+                self.chromosomes[n] = self.profGen.binaryPolygon
             else:
-                self.profGen.generate('pol')
-            self.images[k, :, :] = self.profGen.smoothedImage
-            self.chromosomes[k] = self.profGen.binaryPolygon
+                self.profGen.fourierGenerator(termsF)
+                self.profGen.arrayConversion()
+                self.profGen.encodePolygon()
+                self.images[n, :, :] = self.profGen.smoothedImage
+                self.chromosomes[n] = self.profGen.binaryPolygon
+
+            n += 1
+        for k in range(nP):
+            self.profGen.generate('pol')
+            self.images[n, :, :] = self.profGen.smoothedImage
+            self.chromosomes[n] = self.profGen.binaryPolygon
+            n += 1
+
+            
+        
         self.dlModels.getModelPrediction(self.images)
         self.multipoles = self.dlModels.multipolePredictions
         self.scatteredPower = self.dlModels.scatteredPowerPredictions
         self.getFitness()
 
 
+
+
+
     def getResiduals(self):
-        x = self.objective
+        x = self.objScatteredPower
         y = self.scatteredPower
         self.integral = np.zeros(self.nProfiles)
         self.meanAbsoluteError = np.zeros(self.nProfiles)
@@ -177,9 +242,6 @@ class Population():
         n = 0
         self.nGenerated = int(self.nProfiles*growthRate)
         self.nRetained = int(self.nProfiles - 2*self.nGenerated)
-        print(f'Growth Rate: {growthRate}')
-        print(f'Generating {2*self.nGenerated} new chromosomes')
-        print(f'{self.nRetained} old chromosomes will be retained')
 
         self.selectParentPairs()
         self.selectRetainedPopulation()
@@ -213,9 +275,333 @@ class Population():
         self.scatteredPower = self.dlModels.scatteredPowerPredictions
         self.getFitness()
 
-            
+    def displayParameters(self, outDir=None):
+        if outDir != None:
+            with open(f"{outDir}/InverseDesignParameters.txt", "w") as f:
+                f.write("=============================================================================\n")
+                f.write("Inverse Design Details\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write(f"Initial Generation Makeup\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write(f"{self.nT} Triangles\n")
+                f.write(f"{self.nR} Rectangles\n")
+                f.write(f"{self.nC} Circles\n")
+                f.write(f"{self.nF} Fourier Series Polygons\n")
+                f.write(f"{self.nF} Randomized Polygons\n")
+                f.write(f"{self.nProfiles} Total Profiles\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write("Profile Generation Parameters\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write(f"Profiles are generated with {self.nVertices} vertices\n")
+                f.write(f"Profile vertices are allowed within a polar radius range of ({self.rMin}, {self.rMax})\n")
+                f.write(f"Images rendered from profiles have a resolution of {self.dom[0]} x {self.dom[1]}\n")
+                f.write(f"Images are smoothed by a gaussian filter with a standard deviation of {self.s}\n")
+                f.write(f"Profiles are encoded to {self.p}-bit binary chromosomes\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write("Genetic Operation Parameters\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write(f"Parent chromosomes are split into {self.cP} crossover points\n")
+                f.write(f"New chromosomes have {int(len(self.chromosomes[0])*self.mR)} mutations\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write("Neural Network Parameters\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write(f"Trained neural networks are loaded from:\n  {self.path}\n")
+                f.write("Predicted scattering behaviour defined by:\n")
+                for j in range(len(self.f)):
+                    for i in range(len(self.l)):
+                            if self.l[i] == 1:
+                                if self.f[j] == "E":
+                                    f.write(f"    first order electric dipole\n")
+                                elif self.f[j] == "H":
+                                    f.write(f"    first order magnetic dipole\n")
+                            elif self.l[i] == 2 and self.m[i] == 1:
+                                if self.f[j] == "E":
+                                    f.write(f"    first order electric quadrupole\n")
+                                elif self.f[j] == "H":
+                                    f.write(f"    first order magnetic quadrupole\n")
+                            elif self.l[i] == 2 and self.m[i] == 2:
+                                if self.f[j] == "E":
+                                    f.write(f"    second order electric quadrupole\n")
+                                elif self.f[j] == "H":
+                                    f.write(f"    second order magnetic quadrupole\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write("Inverse Design Input Parameters\n")
+                f.write("--------------------------------------------------------------------------\n")
+                f.write(f'   modelDirectory: {self.path}\n')
+                f.write(f'   nVertices:      {self.nVertices}\n')
+                f.write(f'   rMin:           {self.rMin}\n')
+                f.write(f'   rMax:           {self.rMax}\n')
+                f.write(f'   nT:             {self.nT}\n')
+                f.write(f'   nR:             {self.nR}\n')
+                f.write(f'   nC:             {self.nC}\n')
+                f.write(f'   nP:             {self.nP}\n')
+                f.write(f'   nF:             {self.nF}\n')
+                f.write(f'   cP:             {self.cP}\n')
+                f.write(f'   mR:             {self.mR}\n')
+                f.write(f'   d:              {self.dom}\n')
+                f.write(f'   s:              {self.s}\n')
+                f.write(f'   p:              {self.p}\n')
+                f.write(f'   l:              {self.l}\n')
+                f.write(f'   m:              {self.m}\n')
+                f.write(f'   f:              {self.f}\n')
+                f.write("=============================================================================")
+
+                
+
+        print("=============================================================================")
+        print("Inverse Design Parameters")
+        self.__displayTotals()
+        print("--------------------------------------------------------------------------")
+        print("Profile Generation Parameters")
+        print("--------------------------------------------------------------------------")
+        print(f"Profiles are generated with {self.nVertices} vertices")
+        print(f"Profile vertices are allowed within a polar radius range of ({self.rMin}, {self.rMax})")
+        print(f"Images rendered from profiles have a resolution of {self.dom[0]} x {self.dom[1]}")
+        print(f"Images are smoothed by a gaussian filter with a standard deviation of {self.s}")
+        print(f"Profiles are encoded to {self.p}-bit binary chromosomes")
+        print("--------------------------------------------------------------------------")
+        print("Genetic Operation Parameters")
+        print("--------------------------------------------------------------------------")
+        print(f"Parent chromosomes are split into {self.cP} crossover points")
+        print(f"New chromosomes have {int(len(self.chromosomes[0])*self.mR)} mutations")
+        print("--------------------------------------------------------------------------")
+        print("Neural Network Parameters")
+        print("--------------------------------------------------------------------------")
+        print(f"Trained neural networks are loaded from:\n  {self.path}")
+        print("Predicted scattering behaviour defined by:")
+        for j in range(len(self.f)):
+            for i in range(len(self.l)):
+                    if self.l[i] == 1:
+                        if self.f[j] == "E":
+                            print(f"    first order electric dipole")
+                        elif self.f[j] == "H":
+                            print(f"    first order magnetic dipole")
+                    elif self.l[i] == 2 and self.m[i] == 1:
+                        if self.f[j] == "E":
+                            print(f"    first order electric quadrupole")
+                        elif self.f[j] == "H":
+                            print(f"    first order magnetic quadrupole")
+                    elif self.l[i] == 2 and self.m[i] == 2:
+                        if self.f[j] == "E":
+                            print(f"    second order electric quadrupole")
+                        elif self.f[j] == "H":
+                            print(f"    second order magnetic quadrupole")
+        print("=============================================================================")
+        print('\n')
+
+
+    def writeLoss(self, iGen, growthRate=0, outDir=None):
+        if outDir != None:
+            if iGen == 0:
+                with open(f"{outDir}/Fitness.txt", "w") as f:
+                    f.write("=============================================\n")
+                    f.write("Population Fitness\n")
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
+                    f.write("------------------------------------\n")
+                    fit = self.fitness
+                    fit = np.sort(fit)
+                    fit = np.flip(fit)
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(fit[k], 6)}\n')
+            else:
+                with open(f"{outDir}/Fitness.txt", "a") as f:
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
+                    f.write("------------------------------------\n")
+                    fit = self.fitness
+                    fit = np.sort(fit)
+                    fit = np.flip(fit)
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(fit[k], 6)}\n')
+
+            if iGen == 0:
+                with open(f"{outDir}/MeanSquaredError.txt", "w") as f:
+                    f.write("=============================================\n")
+                    f.write("Population Mean Squared Error\n")
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
+                    f.write("------------------------------------\n")
+                    mse = self.meanSquaredError
+                    mse = np.sort(mse)                    
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(mse[k], 6)}\n')
+            else:
+                with open(f"{outDir}/MeanSquaredError.txt", "a") as f:
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
+                    f.write("------------------------------------\n")
+                    mse = self.meanSquaredError
+                    mse = np.sort(mse)                    
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(mse[k], 6)}\n')
+
+            if iGen == 0:
+                with open(f"{outDir}/RootMeanSquaredError.txt", "w") as f:
+                    f.write("=============================================\n")
+                    f.write("Population Root Mean Squared Error\n")
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
+                    f.write("------------------------------------\n")
+                    rmse = self.rootMeanSquaredError
+                    rmse = np.sort(rmse)
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(rmse[k], 6)}\n')
+            else:
+                with open(f"{outDir}/RootMeanSquaredError.txt", "a") as f:
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
+                    f.write("------------------------------------\n")
+                    rmse = self.rootMeanSquaredError
+                    rmse = np.sort(rmse)
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(rmse[k], 6)}\n')
+
+            if iGen == 0:
+                with open(f"{outDir}/MeanAbsoluteError.txt", "w") as f:
+                    f.write("=============================================\n")
+                    f.write("Population Mean Absolute Error\n")
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
+                    f.write("------------------------------------\n")
+                    mae = self.meanAbsoluteError
+                    mae = np.sort(mae)
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(mae[k], 6)}\n')
+            else:
+                with open(f"{outDir}/MeanAbsoluteError.txt", "a") as f:
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
+                    f.write("------------------------------------\n")
+                    mae = self.meanAbsoluteError
+                    mae = np.sort(mae)
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(mae[k], 6)}\n')
+
+            if iGen == 0:
+                with open(f"{outDir}/MeanRelativeError.txt", "w") as f:
+                    f.write("=============================================\n")
+                    f.write("Population Mean Relative Error\n")
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
+                    f.write("------------------------------------\n")
+                    mre = self.meanRelativeError
+                    mre = np.sort(mre)
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(mre[k], 6)}\n')
+            else:
+                with open(f"{outDir}/MeanRelativeError.txt", "a") as f:
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
+                    f.write("------------------------------------\n")
+                    mre = self.meanRelativeError
+                    mre = np.sort(mre)
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(mre[k], 6)}\n')
+        else:
+            print("Need to define output directory!")
+
+    def sortPopulation(self):
+        sortIndices = np.argsort(self.fitness)
+        sortIndices = np.flip(sortIndices)
+
+        self.fitness = self.fitness[sortIndices]
+        self.images = self.images[sortIndices, :, :]
+        self.multipoles = self.multipoles[:, sortIndices, :]
+        self.scatteredPower  = self.scatteredPower[sortIndices, :]
+
+        #self.chromosomes isn't a numpy array so it should be sorted manually
+        ch = np.zeros(self.nProfiles)
+        ch= list(ch)
+        for k in range(len(self.chromosomes)):
+            ch[k] = self.chromosomes[sortIndices[k]]
+        self.chromosomes = ch
+
+        self.integral = self.integral[sortIndices]
+        self.meanAbsoluteError = self.meanAbsoluteError[sortIndices]
+        self.meanRelativeError = self.meanRelativeError[sortIndices]
+        self.meanSquaredError = self.meanSquaredError[sortIndices]
+        self.rootMeanSquaredError = self.rootMeanSquaredError[sortIndices]
 
 
 
+    def plotSpectrum(self, ax, idx):
+        ax.set_ylim((0.75*np.min(self.objScatteredPower), 1.25*np.max(self.objScatteredPower)))
+        ax.plot(self.wavelengths, self.scatteredPower[idx, :])
+        ax.plot(self.wavelengths, self.objScatteredPower, c='black')
+        ax.fill_between(self.wavelengths, self.scatteredPower[idx, :], self.objScatteredPower,
+         color='red', alpha=0.3, label=f'Fitness: {np.round(self.fitness[idx], 2)}')
+        ax.legend()
 
-    
+
+    def plotSelectPerformers(self, outDir=None, fName=None):
+        """
+        create a plot of the top and bottom 6 performers
+        """
+        self.sortPopulation()
+
+        #top 6
+        f, axs = plt.subplots(3, 4, gridspec_kw={'width_ratios': [2, 4, 4, 2]}, figsize=(12, 6))
+        for i in [0, 3]:
+            for j in [0, 1, 2]:
+                axs[j,i].set_yticks([])
+                axs[j,i].set_xticks([])
+
+        for j in range(np.shape(axs)[0]-1):
+            for i in range(np.shape(axs)[1]):
+                axs[j,i].set_xticks([])
+
+        axs[0,0].imshow(self.images[0, :, :], cmap=plt.cm.binary)
+        axs[0,3].imshow(self.images[1, :, :], cmap=plt.cm.binary)
+        axs[1,0].imshow(self.images[2, :, :], cmap=plt.cm.binary)
+        axs[1,3].imshow(self.images[3, :, :], cmap=plt.cm.binary)
+        axs[2,0].imshow(self.images[4, :, :], cmap=plt.cm.binary)
+        axs[2,3].imshow(self.images[5, :, :], cmap=plt.cm.binary)
+
+        self.plotSpectrum(axs[0,1], 0)
+        self.plotSpectrum(axs[0,2], 1)
+        self.plotSpectrum(axs[1,1], 2)
+        self.plotSpectrum(axs[1,2], 3)
+        self.plotSpectrum(axs[2,1], 4)
+        self.plotSpectrum(axs[2,2], 5)
+
+        axs[2,1].set_xlabel("Wavelength (nm)")
+        axs[2,2].set_xlabel("Wavelength (nm)")
+        
+        f.suptitle(f"Generation {fName} - Top 6 Performers")
+        plt.tight_layout()
+        plt.savefig(f"{outDir}/gen{fName}TopPerformers.png")
+        plt.close()
+
+        #bottom 6
+        f, axs = plt.subplots(3, 4, gridspec_kw={'width_ratios': [2, 4, 4, 2]}, figsize=(12, 6))
+        for i in [0, 3]:
+            for j in [0, 1, 2]:
+                axs[j,i].set_yticks([])
+                axs[j,i].set_xticks([])
+
+        for j in range(np.shape(axs)[0]-1):
+            for i in range(np.shape(axs)[1]):
+                axs[j,i].set_xticks([])
+
+        axs[0,0].imshow(self.images[self.nProfiles-6, :, :], cmap=plt.cm.binary)
+        axs[0,3].imshow(self.images[self.nProfiles-5, :, :], cmap=plt.cm.binary)
+        axs[1,0].imshow(self.images[self.nProfiles-4, :, :], cmap=plt.cm.binary)
+        axs[1,3].imshow(self.images[self.nProfiles-3, :, :], cmap=plt.cm.binary)
+        axs[2,0].imshow(self.images[self.nProfiles-2, :, :], cmap=plt.cm.binary)
+        axs[2,3].imshow(self.images[self.nProfiles-1, :, :], cmap=plt.cm.binary)
+
+        self.plotSpectrum(axs[0,1], self.nProfiles-6)
+        self.plotSpectrum(axs[0,2], self.nProfiles-5)
+        self.plotSpectrum(axs[1,1], self.nProfiles-4)
+        self.plotSpectrum(axs[1,2], self.nProfiles-3)
+        self.plotSpectrum(axs[2,1], self.nProfiles-2)
+        self.plotSpectrum(axs[2,2], self.nProfiles-1)
+
+        axs[2,1].set_xlabel("Wavelength (nm)")
+        axs[2,2].set_xlabel("Wavelength (nm)")
+        
+        f.suptitle(f"Generation {fName} - Bottom 6 Performers")
+        plt.tight_layout()
+        plt.savefig(f"{outDir}/gen{fName}BottomPerformers.png")
+        plt.close()

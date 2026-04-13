@@ -40,6 +40,7 @@ class Population():
         self.m = Support.getkwarg(kwargs, defaultKwargs["m"], keywords["m"])
         self.f = Support.getkwarg(kwargs, defaultKwargs["f"], keywords["f"])
         self.path = modelDirectory
+        self.setScaleFlag = 'unset'
 
     
         #add external classes for use later
@@ -144,6 +145,22 @@ class Population():
         self.scatteredPower = self.dlModels.scatteredPowerPredictions
         self.getFitness()
 
+        
+
+
+    def setFitnessScaling(self):
+        print("setting fitness scale")
+        self.gapScale = -np.log(0.1)/np.max(self.integral)
+        self.rmseScale = -np.log(0.1)/np.max(self.rootMeanSquaredError)
+        self.mseScale = -np.log(0.1)/np.max(self.meanSquaredError)
+        self.maeScale = -np.log(0.1)/np.max(self.meanAbsoluteError)
+        self.mreScale = -np.log(0.1)/np.max(self.meanRelativeError)
+
+        print(f"gap: {self.gapScale}")
+        print(f"rmse: {self.rmseScale}")
+        print(f"mse: {self.mseScale}")
+        print(f"mae: {self.maeScale}")
+        print(f"mre: {self.mreScale}")
 
 
 
@@ -151,8 +168,6 @@ class Population():
     def getResiduals(self):
         x = self.objScatteredPower
         y = self.scatteredPower
-        x = x / np.max(x)
-        y = y / np.max(y)
         self.integral = np.zeros(self.nProfiles)
         self.meanAbsoluteError = np.zeros(self.nProfiles)
         self.meanRelativeError = np.zeros(self.nProfiles)
@@ -166,43 +181,62 @@ class Population():
             rootMeanSquaredError = np.zeros(len(self.wavelengths))
             for w in range(len(self.wavelengths)):
                 distance[w] = np.sqrt(np.abs(x[w]**2 - y[n,w]**2))
-                absoluteError[w] = np.abs(x[w] - y[n,w])
-                relativeError[w] = absoluteError[w]/x[w]
-                meanSquaredError[w] = (x[w] - y[n,w])**2
-                rootMeanSquaredError[w] = (x[w] - y[n,w])**2
                 if np.isnan(distance[w]):
-                    distance[w] = 1000
+                    distance[w] = 0
+                    distance[w] = np.max(distance)
+                absoluteError[w] = np.abs(x[w] - y[n,w])
                 if np.isnan(absoluteError[w]):
-                    absoluteError[w] = 1000
+                    absoluteError[w] = 0
+                    absoluteError[w] = np.max(absoluteError)
+                relativeError[w] = absoluteError[w]/x[w]
                 if np.isnan(relativeError[w]):
-                    relativeError[w] = 1000
+                    relativeError[w] = 0
+                    relativeError[w] = np.max(relativeError)
+                meanSquaredError[w] = (x[w] - y[n,w])**2
                 if np.isnan(meanSquaredError[w]):
-                    meanSquaredError[w] = 1000
+                    meanSquaredError[w] = 0
+                    meanSquaredError[w] = np.max(meanSquaredError)
+                rootMeanSquaredError[w] = (x[w] - y[n,w])**2
                 if np.isnan(rootMeanSquaredError[w]):
-                    rootMeanSquaredError[w] = 1000
+                    rootMeanSquaredError[w] = 0
+                    rootMeanSquaredError[w] = np.max(rootMeanSquaredError)
 
-            self.integral[n] = np.round(np.sum(distance), 5)
-            self.meanAbsoluteError[n] = np.round(np.mean(absoluteError), 5)
-            self.meanRelativeError[n] = np.round(np.mean(relativeError), 5)
-            self.meanSquaredError[n] = np.round(np.mean(meanSquaredError), 5)
-            self.rootMeanSquaredError[n] = np.round(np.sqrt(np.mean(rootMeanSquaredError)), 5)
+                
+                
+
+            self.integral[n] = np.sum(distance)
+            self.meanAbsoluteError[n] = np.mean(absoluteError)
+            self.meanRelativeError[n] = np.mean(relativeError)
+            self.meanSquaredError[n] = np.mean(meanSquaredError)
+            self.rootMeanSquaredError[n] = np.sqrt(np.mean(rootMeanSquaredError))
+
+
+
+
+
 
     
+
     def getFitness(self):
         self.getResiduals()
 
+        if self.setScaleFlag == 'unset':
+            self.setFitnessScaling()
+            self.setScaleFlag = 'set'
+
+
         if self.fitnessType == 'gap':
-            self.fitness = scale(0.005,self.integral)
+            self.fitness = scale(self.gapScale,self.integral)
         elif self.fitnessType == 'mse':
-            self.fitness = scale(75,self.meanSquaredError)
+            self.fitness = scale(self.mseScale,self.meanSquaredError)
         elif self.fitnessType == 'rmse':
-            self.fitness = scale(2,self.rootMeanSquaredError)
+            self.fitness = scale(self.rmseScale,self.rootMeanSquaredError)
         elif self.fitnessType == 'mae':
-            self.fitness = scale(2.5,self.meanAbsoluteError)
+            self.fitness = scale(self.maeScale,self.meanAbsoluteError)
         elif self.fitnessType == 'mre':
-            self.fitness = scale(3.5,self.meanRelativeError)
+            self.fitness = scale(self.mreScale,self.meanRelativeError)
         else:
-            self.fitness = scale(0.005,self.integral)
+            self.fitness = scale(self.gapScale,self.integral)
 
 
         
@@ -218,7 +252,7 @@ class Population():
         for k in range(len(p)):
             temp += p[k]
             
-            if temp >= x:
+            if temp > x:
                 j = i[k]
                 f = np.delete(f, k)
                 i = np.delete(i, k)
@@ -432,6 +466,27 @@ class Population():
                         f.write(f'{np.round(fit[k], 6)}\n')
 
             if iGen == 0:
+                with open(f"{outDir}/GapError.txt", "w") as f:
+                    f.write("=============================================\n")
+                    f.write("Population Gap\n")
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
+                    f.write("------------------------------------\n")
+                    integral = self.integral
+                    integral = np.sort(integral)                    
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(integral[k], 6)}\n')
+            else:
+                with open(f"{outDir}/GapError.txt", "a") as f:
+                    f.write("------------------------------------\n")
+                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
+                    f.write("------------------------------------\n")
+                    integral = self.integral
+                    integral = np.sort(integral)               
+                    for k in range(len(self.fitness)):
+                        f.write(f'{np.round(integral[k], 6)}\n')
+
+            if iGen == 0:
                 with open(f"{outDir}/MeanSquaredError.txt", "w") as f:
                     f.write("=============================================\n")
                     f.write("Population Mean Squared Error\n")
@@ -586,7 +641,7 @@ class Population():
         axs[2,1].set_xlabel("Wavelength (nm)")
         axs[2,2].set_xlabel("Wavelength (nm)")
         
-        f.suptitle(f"Generation {fName} - Top 6 Performers")
+        f.suptitle(f"{self.fitnessType} Fit - Generation {fName} - Top 6 Performers")
         plt.tight_layout()
         plt.savefig(f"{outDir}/gen{fName}TopPerformers.png")
         plt.close()
@@ -619,7 +674,7 @@ class Population():
         axs[2,1].set_xlabel("Wavelength (nm)")
         axs[2,2].set_xlabel("Wavelength (nm)")
         
-        f.suptitle(f"Generation {fName} - Bottom 6 Performers")
+        f.suptitle(f"{self.fitnessType} Fit - Generation {fName} - Bottom 6 Performers")
         plt.tight_layout()
         plt.savefig(f"{outDir}/gen{fName}BottomPerformers.png")
         plt.close()

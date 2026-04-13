@@ -13,12 +13,9 @@ from scipy.io import savemat
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 
-global outputDirectory
-outputDirectory = "data"
-try:
-    os.mkdir(f"{outputDirectory}")
-except FileExistsError:
-    print(f"Directory: {outputDirectory} Exists")
+
+
+
 
 def writePopulationData(pop, fname):
     df = pd.DataFrame({
@@ -88,18 +85,36 @@ def plotPopulationScattering(pop, fname):
 
 
 
+np.random.seed(seed=0)
+ft = sys.argv[1]
 
-nGenerations = 150
+
+nGenerations = 500
+#seeds = np.random.randint(1,10000, nGenerations)
+
+
+outDir = f'{ft}Test'
+outputDirectory = outDir
+try:
+    os.mkdir(f"{outputDirectory}")
+except FileExistsError:
+    print(f"Directory: {outputDirectory} Exists")
+
 
 generationalFitness = []
 generationalIntegral = []
-ft = 'rmse'
 pop = invdes.Population(
-    nVertices=24, fitnessType=ft,
-    modelDirectory="/media/work/evan/deep_learning_data/trained_models",
-    rMin=10, rMax=75, d=(180,180), s=12, p=12,
-    mR = 0.20, cP = 1,
-    l=[1,2,2], m=[1,1,2], f=['E', 'H'])
+        nVertices=24, fitnessType=ft,
+        modelDirectory="/media/work/evan/deep_learning_data/trained_models",
+        rMin=10, rMax=75, d=(180,180), s=5, p=12,
+        mR = 0.1, cP = 1,
+        l=[1,2,2], m=[1,1,2], f=['E', 'H'])
+pop.defineObjective(spectrum=np.loadtxt("objScatteredPower.txt"))
+pop.initialize(nT=200, nR = 5, nC = 5, nP = 5, nF = 5)
+
+
+
+
 
 #Generate a new shape as an objective
 #pop.defineObjective(profileType = 'pol', termsF=5)
@@ -108,11 +123,8 @@ pop = invdes.Population(
 #set a scattered power spectrum as an objective
 pop.defineObjective(spectrum=np.loadtxt("objScatteredPower.txt"))
 
-
-
-pop.initialize(nT=20, nR=20, nC=20, nF=20, nP=20)
-pop.displayParameters(outDir="data")
-pop.writeLoss(iGen=0, outDir="data") 
+pop.displayParameters(outDir=outDir)
+pop.writeLoss(iGen=0, outDir=outDir) 
 pop.plotSelectPerformers(outputDirectory, "0")
 
 """
@@ -131,29 +143,14 @@ plt.close()
 
 
 
-
-
-generationalFitness.append(pop.fitness)
-if ft == 'mse':
-    generationalIntegral.append(pop.meanSquaredError)
-elif ft  == 'rmse':
-    generationalIntegral.append(pop.rootMeanSquaredError)
-elif ft == 'mre':
-    generationalIntegral.append(pop.meanRelativeError)
-elif ft == 'mae':
-    generationalIntegral.append(pop.meanAbsoluteError)
-elif ft == 'gap':
-    generationalIntegral.append(pop.integral)
-else:
-    generationalIntegral.append(pop.integral)
-
-
 print(pop.fitnessType)
 for n in range(nGenerations):
+    #np.random.seed(seed=seeds[n])
     print(f"Generation {n + 1}")
     x = (0.5-0.25)*np.random.rand() + 0.25
+    x = 0.45
     pop.newGeneration(x)
-    pop.writeLoss(iGen=n+1, growthRate=x, outDir="data")
+    pop.writeLoss(iGen=n+1, growthRate=x, outDir=outDir)
     pop.plotSelectPerformers(outputDirectory, f"{n+1}")
     generationalFitness.append(pop.fitness)
 
@@ -199,7 +196,7 @@ for i in range(len(generationalFitness)):
     plt.scatter(generationalIntegral[i], generationalFitness[i])
     plt.xlim((xmin, xmax))
     plt.ylim((ymin, ymax))
-    plt.title(f"Generation {i} Fitness")
+    plt.title(f"{ft} Fit - Generation {i} Fitness")
     if ft == 'mse':
         plt.xlabel("Mean Squared Error")
     elif ft  == 'rmse':

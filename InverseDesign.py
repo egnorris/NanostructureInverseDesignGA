@@ -15,16 +15,16 @@ defaultKwargs = Support.defaultKwargs
 keywords = Support.keywords
 
 
-def scale(x):
-    return np.exp(-0.01*x)
+def scale(a,x):
+    return np.exp(-a*x)
         
 
 class Population():
-    def __init__(self, nVertices, modelDirectory, **kwargs):
+    def __init__(self, nVertices, modelDirectory, fitnessType='gap', **kwargs):
 
         #required Arguments
         self.nVertices = nVertices
-
+        self.fitnessType = fitnessType
         #Keyword Arguments
         #Profile Generation
         self.rMin = Support.getkwarg(kwargs, defaultKwargs["rMin"], keywords["rMin"])
@@ -65,8 +65,7 @@ class Population():
             self.dlModels.getModelPrediction(temp)
             self.objImage = self.profGen.smoothedImage
             self.objScatteredPower = self.dlModels.scatteredPowerPredictions[0, :]
-        elif (profileType == None) and (spectrum != None):
-            if len(spectrum) == len(self.wavelengths):
+        elif (profileType == None):
                 self.objScatteredPower = spectrum
         
         else:
@@ -152,6 +151,8 @@ class Population():
     def getResiduals(self):
         x = self.objScatteredPower
         y = self.scatteredPower
+        x = x / np.max(x)
+        y = y / np.max(y)
         self.integral = np.zeros(self.nProfiles)
         self.meanAbsoluteError = np.zeros(self.nProfiles)
         self.meanRelativeError = np.zeros(self.nProfiles)
@@ -189,7 +190,21 @@ class Population():
     
     def getFitness(self):
         self.getResiduals()
-        self.fitness = scale(self.integral)
+
+        if self.fitnessType == 'gap':
+            self.fitness = scale(0.005,self.integral)
+        elif self.fitnessType == 'mse':
+            self.fitness = scale(75,self.meanSquaredError)
+        elif self.fitnessType == 'rmse':
+            self.fitness = scale(2,self.rootMeanSquaredError)
+        elif self.fitnessType == 'mae':
+            self.fitness = scale(2.5,self.meanAbsoluteError)
+        elif self.fitnessType == 'mre':
+            self.fitness = scale(3.5,self.meanRelativeError)
+        else:
+            self.fitness = scale(0.005,self.integral)
+
+
         
 
 
@@ -302,6 +317,7 @@ class Population():
                 f.write("--------------------------------------------------------------------------\n")
                 f.write(f"Parent chromosomes are split into {self.cP} crossover points\n")
                 f.write(f"New chromosomes have {int(len(self.chromosomes[0])*self.mR)} mutations\n")
+                f.write(f"Fitness is calculated from {self.fitnessType}\n")
                 f.write("--------------------------------------------------------------------------\n")
                 f.write("Neural Network Parameters\n")
                 f.write("--------------------------------------------------------------------------\n")
@@ -526,11 +542,13 @@ class Population():
 
 
     def plotSpectrum(self, ax, idx):
-        ax.set_ylim((0.75*np.min(self.objScatteredPower), 1.25*np.max(self.objScatteredPower)))
-        ax.plot(self.wavelengths, self.scatteredPower[idx, :])
-        ax.plot(self.wavelengths, self.objScatteredPower, c='black')
-        ax.fill_between(self.wavelengths, self.scatteredPower[idx, :], self.objScatteredPower,
-         color='red', alpha=0.3, label=f'Fitness: {np.round(self.fitness[idx], 2)}')
+        y0 = self.scatteredPower[idx, :] / np.max(self.scatteredPower[idx, :])
+        y1 = self.objScatteredPower / np.max(self.objScatteredPower)
+        ax.set_ylim((0.5, 1.1))
+        ax.plot(self.wavelengths, y0)
+        ax.plot(self.wavelengths, y1, c='black')
+        ax.fill_between(self.wavelengths, y0, y1,
+         color='red', alpha=0.3, label=f'Fitness: {np.round(self.fitness[idx], 3)}')
         ax.legend()
 
 

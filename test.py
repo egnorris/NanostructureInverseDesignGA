@@ -5,6 +5,7 @@ import ProfileGeneration as pg
 import DeepLearning as dl
 import InverseDesign as invdes
 import matplotlib.pyplot as plt
+import sys
 
 import pandas as pd
 from scipy.io import savemat
@@ -87,42 +88,96 @@ def plotPopulationScattering(pop, fname):
 
 
 
-nGenerations = 300
+
+nGenerations = 150
 
 generationalFitness = []
 generationalIntegral = []
-
+ft = 'rmse'
 pop = invdes.Population(
-    nVertices=30,
+    nVertices=24, fitnessType=ft,
     modelDirectory="/media/work/evan/deep_learning_data/trained_models",
-    rMin=10, rMax=75, d=(180,180), s=5, p=12,
-    mR = 0.10, cP = 1,
+    rMin=10, rMax=75, d=(180,180), s=12, p=12,
+    mR = 0.20, cP = 1,
     l=[1,2,2], m=[1,1,2], f=['E', 'H'])
 
+#Generate a new shape as an objective
+#pop.defineObjective(profileType = 'pol', termsF=5)
+#np.savetxt("objScatteredPower.txt",pop.objScatteredPower)
 
-pop.defineObjective(profileType = 'fou', termsF=5)
-pop.initialize(nT=30, nR=30, nC=5, nF=5, nP=30)
+#set a scattered power spectrum as an objective
+pop.defineObjective(spectrum=np.loadtxt("objScatteredPower.txt"))
+
+
+
+pop.initialize(nT=20, nR=20, nC=20, nF=20, nP=20)
 pop.displayParameters(outDir="data")
 pop.writeLoss(iGen=0, outDir="data") 
 pop.plotSelectPerformers(outputDirectory, "0")
 
+"""
+
 plt.imshow(pop.objImage, cmap=plt.cm.binary)
-plt.savefig(f"{outputDirectory}/objProfile.png")
+plt.savefig(f"objProfile.png")
 plt.close()
+plt.plot(pop.wavelengths, pop.objScatteredPower / np.max(pop.objScatteredPower), c='black')
+plt.xlim(300, 800)
+plt.xlabel("Wavelength (nm)")
+plt.ylabel("Normalized Scattered Power")
+plt.title("Objective Scattered Power Spectrum")
+plt.savefig(f"objScatteredPowerSpectrum.png")
+plt.close()
+"""
+
+
+
+
 
 generationalFitness.append(pop.fitness)
-generationalIntegral.append(pop.integral)
+if ft == 'mse':
+    generationalIntegral.append(pop.meanSquaredError)
+elif ft  == 'rmse':
+    generationalIntegral.append(pop.rootMeanSquaredError)
+elif ft == 'mre':
+    generationalIntegral.append(pop.meanRelativeError)
+elif ft == 'mae':
+    generationalIntegral.append(pop.meanAbsoluteError)
+elif ft == 'gap':
+    generationalIntegral.append(pop.integral)
+else:
+    generationalIntegral.append(pop.integral)
 
 
-
+print(pop.fitnessType)
 for n in range(nGenerations):
+    print(f"Generation {n + 1}")
     x = (0.5-0.25)*np.random.rand() + 0.25
     pop.newGeneration(x)
     pop.writeLoss(iGen=n+1, growthRate=x, outDir="data")
     pop.plotSelectPerformers(outputDirectory, f"{n+1}")
     generationalFitness.append(pop.fitness)
-    generationalIntegral.append(pop.integral)
 
+    #for i in range(pop.nProfiles):
+    #    ProfilesList[k, :, :] = pop.images[i, : , :]
+    #    k += 1
+
+
+    if ft == 'mse':
+        generationalIntegral.append(pop.meanSquaredError)
+    elif ft == 'rmse':
+        generationalIntegral.append(pop.rootMeanSquaredError)
+    elif ft == 'mre':
+        generationalIntegral.append(pop.meanRelativeError)
+    elif ft == 'mae':
+        generationalIntegral.append(pop.meanAbsoluteError)
+    elif ft == 'gap':
+        generationalIntegral.append(pop.integral)
+    else:
+        generationalIntegral.append(pop.integral)
+
+
+
+#np.save(f"{outputDirectory}/allProfiles.npy", ProfilesList)
 
 xmax = np.max(generationalIntegral)
 xmin = np.min(generationalIntegral)
@@ -132,16 +187,32 @@ xmin = np.min(generationalIntegral)
 ymax = np.max(generationalFitness)
 ymin = np.min(generationalFitness)
 
-xmax = min(xmax, 200)
+if ft == 'gap':
+    xmax = min(xmax, 100)
+else:
+    xmax = min(xmax, 3)
+
 ymax = min(ymax, 1)
 
 for i in range(len(generationalFitness)):
-    plt.plot(np.linspace(xmin, xmax, 10), invdes.scale(np.linspace(xmin, xmax, 10)), zorder = -1, lw=1, c='black')
+    #plt.plot(np.linspace(xmin, xmax, 10), invdes.scale(np.linspace(xmin, xmax, 10)), zorder = -1, lw=1, c='black')
     plt.scatter(generationalIntegral[i], generationalFitness[i])
     plt.xlim((xmin, xmax))
     plt.ylim((ymin, ymax))
     plt.title(f"Generation {i} Fitness")
-    plt.xlabel("Object - Proposal Gap Area")
+    if ft == 'mse':
+        plt.xlabel("Mean Squared Error")
+    elif ft  == 'rmse':
+        plt.xlabel("Root Mean Squared Error")
+    elif ft  == 'mre':
+        plt.xlabel("Mean Relative Error")
+    elif ft  == 'mae':
+        plt.xlabel("Mean Absolute Error")
+    elif ft == 'gap':
+        plt.xlabel("Gap")
+    else:
+        plt.xlabel("")
+    
     plt.ylabel("Fitness")
     plt.savefig(f"{outputDirectory}/fitnessGen{i}.png")
     plt.close()

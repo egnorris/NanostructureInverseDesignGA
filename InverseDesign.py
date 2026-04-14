@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 global defaultKwargs
 global keywords
@@ -256,6 +257,9 @@ class Population():
         else:
             self.fitness = scale(self.gapScale,self.integral)
 
+        for k in range(len(self.fitness)):
+            if self.fitness[k] >= 1.0:
+                self.fitness[k] = 0.001
 
         
 
@@ -334,7 +338,6 @@ class Population():
             newChromosomes[n] = self.chromosomes[self.retainedPopulation[k]]
             newImages[n, :, :] = self.images[self.retainedPopulation[k], :, :]
             n += 1
-        print(n)
         
         self.chromosomes = newChromosomes
         self.images = newImages
@@ -620,6 +623,7 @@ class Population():
         y1 = self.objScatteredPower / np.max(self.objScatteredPower)
         ax.set_ylim((0.5, 1.1))
         ax.plot(self.wavelengths, y0)
+        ax.scatter(self.wavelengths, y0, s=5)
         ax.plot(self.wavelengths, y1, c='black')
         ax.fill_between(self.wavelengths, y0, y1,
          color='red', alpha=0.3, label=f'fit: {np.round(self.fitness[idx], 3)}')

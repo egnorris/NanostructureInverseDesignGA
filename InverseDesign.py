@@ -48,11 +48,11 @@ class Population():
         self.dlModels = dl.DeepLearning(self.path,l=self.l,m=self.m,f=self.f)
         self.dlModels.loadModels()
     
-    def defineObjective(self, profileType=None, spectrum=None, termsF=None):
-        if (profileType != None) and (spectrum == None):
+    def defineObjective(self, profileType0=None, profileType1=None, spectrum=None, termsF=None):
+        if (profileType1 != None) and (spectrum == None):
             temp = np.zeros((1, self.dom[0], self.dom[1]))
-            self.profGen.generate(profileType)
-            if profileType == 'fou':
+            self.profGen.generate(profileType0)
+            if profileType0 == 'fou':
                 if termsF == None:
                     self.profGen.fourierGenerator(np.random.randint(2,5))
                     self.profGen.arrayConversion()
@@ -61,12 +61,31 @@ class Population():
                     self.profGen.fourierGenerator(termsF)
                     self.profGen.arrayConversion()
                     self.profGen.encodePolygon()
-
+            p0 = self.profGen.binaryPolygon
+            self.profGen.generate(profileType1)
+            if profileType1 == 'fou':
+                if termsF == None:
+                    self.profGen.fourierGenerator(np.random.randint(2,5))
+                    self.profGen.arrayConversion()
+                    self.profGen.encodePolygon()
+                else:
+                    self.profGen.fourierGenerator(termsF)
+                    self.profGen.arrayConversion()
+                    self.profGen.encodePolygon()
             temp[0, :, :] = self.profGen.smoothedImage
+            p1 = self.profGen.binaryPolygon
+
+            g = go.GeneticOperations(p0, p1, mR=0.1, cP=1)
+            g.operate()
+            self.profGen.decodeChromosome(g.c0)
+            i0 = self.profGen.smoothedImage
+
+            temp[0, :, :] = i0
             self.dlModels.getModelPrediction(temp)
-            self.objImage = self.profGen.smoothedImage
+            self.objImage = i0
+            self.objChromosome = g.c0
             self.objScatteredPower = self.dlModels.scatteredPowerPredictions[0, :]
-        elif (profileType == None):
+        elif (profileType1 == None):
                 self.objScatteredPower = spectrum
         
         else:
@@ -163,42 +182,41 @@ class Population():
         print(f"mre: {self.mreScale}")
 
 
-
-
     def getResiduals(self):
         x = self.objScatteredPower
-        y = self.scatteredPower
         self.integral = np.zeros(self.nProfiles)
         self.meanAbsoluteError = np.zeros(self.nProfiles)
         self.meanRelativeError = np.zeros(self.nProfiles)
         self.meanSquaredError = np.zeros(self.nProfiles)
         self.rootMeanSquaredError = np.zeros(self.nProfiles)
         for n in range(self.nProfiles):
+            y = self.scatteredPower[n, :]
+            y = y / np.max(y)
             distance = np.zeros(len(self.wavelengths))
             absoluteError = np.zeros(len(self.wavelengths))
             relativeError = np.zeros(len(self.wavelengths))
             meanSquaredError= np.zeros(len(self.wavelengths))
             rootMeanSquaredError = np.zeros(len(self.wavelengths))
             for w in range(len(self.wavelengths)):
-                distance[w] = np.sqrt(np.abs(x[w]**2 - y[n,w]**2))
+                distance[w] = np.sqrt(np.abs(x[w]**2 - y[w]**2))
                 if np.isnan(distance[w]):
-                    distance[w] = 0
+                    distance[w] = -1
                     distance[w] = np.max(distance)
-                absoluteError[w] = np.abs(x[w] - y[n,w])
+                absoluteError[w] = np.abs(x[w] - y[w])
                 if np.isnan(absoluteError[w]):
-                    absoluteError[w] = 0
+                    absoluteError[w] = -1
                     absoluteError[w] = np.max(absoluteError)
                 relativeError[w] = absoluteError[w]/x[w]
                 if np.isnan(relativeError[w]):
-                    relativeError[w] = 0
+                    relativeError[w] = -1
                     relativeError[w] = np.max(relativeError)
-                meanSquaredError[w] = (x[w] - y[n,w])**2
+                meanSquaredError[w] = (x[w] - y[w])**2
                 if np.isnan(meanSquaredError[w]):
-                    meanSquaredError[w] = 0
+                    meanSquaredError[w] = -1
                     meanSquaredError[w] = np.max(meanSquaredError)
-                rootMeanSquaredError[w] = (x[w] - y[n,w])**2
+                rootMeanSquaredError[w] = (x[w] - y[w])**2
                 if np.isnan(rootMeanSquaredError[w]):
-                    rootMeanSquaredError[w] = 0
+                    rootMeanSquaredError[w] = -1
                     rootMeanSquaredError[w] = np.max(rootMeanSquaredError)
 
                 
@@ -316,6 +334,7 @@ class Population():
             newChromosomes[n] = self.chromosomes[self.retainedPopulation[k]]
             newImages[n, :, :] = self.images[self.retainedPopulation[k], :, :]
             n += 1
+        print(n)
         
         self.chromosomes = newChromosomes
         self.images = newImages
@@ -603,7 +622,7 @@ class Population():
         ax.plot(self.wavelengths, y0)
         ax.plot(self.wavelengths, y1, c='black')
         ax.fill_between(self.wavelengths, y0, y1,
-         color='red', alpha=0.3, label=f'Fitness: {np.round(self.fitness[idx], 3)}')
+         color='red', alpha=0.3, label=f'fit: {np.round(self.fitness[idx], 3)}')
         ax.legend()
 
 

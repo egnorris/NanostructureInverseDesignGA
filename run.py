@@ -6,6 +6,7 @@ import pandas as pd
 from scipy.io import savemat
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 import InverseDesign
 
@@ -36,7 +37,20 @@ def loadExistingTarget(kwargs):
     y = np.loadtxt(kwargs['targetPath'])
     return y / np.max(y)
 
+def saveTopPerformers(kwargs, pop):
+    pop.sortPopulation()
+    for k in range(kwargs['numSave']):
+        temp = {
+            "Profile":  pop.images[k, :, :],
+            "Fitness": pop.fitness[k],
+            "Mean Squared Error": pop.meanSquaredError[k],
+            "Root Mean Squared Error": pop.rootMeanSquaredError[k],
+            "Mean Absolute Error": pop.meanAbsoluteError[k],
+            "Mean Relative Error": pop.meanRelativeError[k],
+            "Gap": pop.integral[k],
+            "Scattered Power": pop.scatteredPower[k, :]}
 
+        topPerformersDict[f'G{0}-{k}'] = temp
 
 
 parser = argparse.ArgumentParser(description="Run Genetic Algorithm Inverse Design")
@@ -174,6 +188,10 @@ try:
 except FileExistsError:
     print(f"Directory: {outDir} Exists")
 
+global topPerformersDict
+topPerformersDict = {}
+
+
 #Initialize Population
 pop = InverseDesign.Population(
     nVertices=kwargs['nV'],
@@ -200,11 +218,22 @@ pop.initialize(
     nP=kwargs['nP'],
     nF=kwargs['nF'])
 
+saveTopPerformers(kwargs, pop)
+pop.plotSelectPerformers(outDir, f"0")
+print(pop.nProfiles)
+
+
 nGenerations = kwargs['numGenerations']
-for n in range(nGenerations):
-    print(f"Generation {n+1}")
-    birthRate = 0.45
+for c in range(nGenerations):
+    print(f"Generation {c+1}")
+    birthRate = 0.4
     pop.newGeneration(birthRate)
+    pop.writeLoss(iGen=c+1, growthRate=birthRate, outDir=outDir)
+    pop.plotSelectPerformers(outDir, f"{c+1}")
+    saveTopPerformers(kwargs, pop)
+    
+    
     
 
 
+savemat(f"{outDir}/TopPerformers-{kwargs['fitnessType']}.mat", topPerformersDict)

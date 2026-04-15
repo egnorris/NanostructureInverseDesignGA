@@ -21,7 +21,7 @@ def scale(a,x):
         
 
 class Population():
-    def __init__(self, nVertices, modelDirectory, lambdaMin=325, lambdaMax=700, fitnessType='gap', **kwargs):
+    def __init__(self, nVertices, modelDirectory, lambdaMin=300, lambdaMax=800, fitnessType='gap', **kwargs):
 
         #required Arguments
         self.nVertices = nVertices
@@ -329,10 +329,14 @@ class Population():
             self.chromosomes[-1] = TopChromosome
             self.images[-1,:,:] = TopImage
         
+        previousBestFitness = self.fitness[0]
         self.dlModels.getModelPrediction(self.images)
         self.multipoles = self.dlModels.multipolePredictions
         self.scatteredPower = self.dlModels.scatteredPowerPredictions
         self.getFitness()
+
+        if np.max(self.fitness) > previousBestFitness:
+            print(f"New Fitness Record! - {np.round(np.max(self.fitness),4)} from {np.round(previousBestFitness,4)}")
 
         
 
@@ -512,8 +516,8 @@ class Population():
         ax.scatter(self.wavelengths, y0, s=5)
         ax.plot(self.wavelengths, y1, c='black')
         ax.fill_between(self.wavelengths[self.k0:self.k1], y0[self.k0:self.k1], y1[self.k0:self.k1],
-         color='red', alpha=0.3, label=f'fit: {np.round(self.fitness[idx], 3)}')
-        ax.legend()
+         color='red', alpha=0.3, label=f'fit: {np.round(self.fitness[idx], 4)}')
+        ax.legend(loc='upper right')
 
 
     def plotSelectPerformers(self, outDir=None, fName=None):

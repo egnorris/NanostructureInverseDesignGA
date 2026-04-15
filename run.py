@@ -221,6 +221,14 @@ print(pop.nProfiles)
 
 
 nGenerations = kwargs['numGenerations']
+endCondition = -1
+topFitness = np.max(pop.fitness)
+
+gap = 1
+gapLimit = int(0.25*nGenerations) + 1
+endCondition = 0.995
+
+print(f"Evolution will terminate after {gapLimit} generations with no improvement if the top fitness is > {endCondition}")
 for c in range(nGenerations):
     print(f"Generation {c+1}")
     birthRate = 0.45
@@ -228,6 +236,25 @@ for c in range(nGenerations):
     pop.writeLoss(iGen=c+1, growthRate=birthRate, outDir=outDir)
     pop.plotSelectPerformers(outDir, f"{c+1}")
     saveTopPerformers(kwargs, pop)
+    
+    if np.max(pop.fitness) > topFitness:
+        if gap == 1:
+            print(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generation.")
+        else:
+            print(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generations.")
+        topFitness = np.max(pop.fitness)
+        gap = 0
+
+    if (gap > gapLimit) and (np.max(pop.fitness) >= endCondition):
+        print(f"Top Fitness > {endCondition} and no fitness improvement in {gapLimit} generations")
+        print(f"Evolution Conlcuded after {c+1} Generations")
+        break
+    elif (gap > gapLimit) and (np.max(pop.fitness) < endCondition):
+        print(f"No fitness improvement in {gapLimit} generations but end Conditions not met: Top Fitness < {endCondition}")
+    if c+1 == nGenerations:
+        print("Generation Limit Reached")
+    gap += 1
+        
     
     
     

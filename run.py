@@ -31,11 +31,11 @@ def generateNewTarget(kwargs):
     plt.close()
     np.savetxt("targetScatteredPower.txt",pop.objScatteredPower)
 
-    return pop.objScatteredPower / np.max(pop.objScatteredPower)
+    return pop.objScatteredPower
 
 def loadExistingTarget(kwargs):
     y = np.loadtxt(kwargs['targetPath'])
-    return y / np.max(y)
+    return y 
 
 def saveTopPerformers(kwargs, pop):
     pop.sortPopulation()
@@ -43,11 +43,6 @@ def saveTopPerformers(kwargs, pop):
         temp = {
             "Profile":  pop.images[k, :, :],
             "Fitness": pop.fitness[k],
-            "Mean Squared Error": pop.meanSquaredError[k],
-            "Root Mean Squared Error": pop.rootMeanSquaredError[k],
-            "Mean Absolute Error": pop.meanAbsoluteError[k],
-            "Mean Relative Error": pop.meanRelativeError[k],
-            "Gap": pop.integral[k],
             "Scattered Power": pop.scatteredPower[k, :]}
 
         topPerformersDict[f'G{0}-{k}'] = temp
@@ -78,19 +73,19 @@ parser.add_argument('-mD', '--modelDirectory', type=str, required=False, default
 parser.add_argument('-nV', type=int, required=False, default = 24,
     help="")
 
-parser.add_argument('-nT', type=int, required=False, default = 200,
+parser.add_argument('-nT', type=int, required=False, default = 30,
     help="")
 
-parser.add_argument('-nR', type=int, required=False, default = 5,
+parser.add_argument('-nR', type=int, required=False, default = 30,
     help="")
 
-parser.add_argument('-nC', type=int, required=False, default = 5,
+parser.add_argument('-nC', type=int, required=False, default = 30,
     help="")
 
-parser.add_argument('-nP', type=int, required=False, default = 5,
+parser.add_argument('-nP', type=int, required=False, default = 30,
     help="")
 
-parser.add_argument('-nF', type=int, required=False, default = 5,
+parser.add_argument('-nF', type=int, required=False, default = 30,
     help="")
 
 parser.add_argument('-r0', '--rMin', type=int, required=False, default = 10,
@@ -197,6 +192,8 @@ pop = InverseDesign.Population(
     nVertices=kwargs['nV'],
     fitnessType=kwargs['fitnessType'],
     modelDirectory=kwargs['modelDirectory'],
+    lambdaMin=325,
+    lambdaMax=700,
     rMin=kwargs['rMin'],
     rMax=kwargs['rMax'],
     d=(180,180),
@@ -226,7 +223,7 @@ print(pop.nProfiles)
 nGenerations = kwargs['numGenerations']
 for c in range(nGenerations):
     print(f"Generation {c+1}")
-    birthRate = 0.4
+    birthRate = 0.45
     pop.newGeneration(birthRate)
     pop.writeLoss(iGen=c+1, growthRate=birthRate, outDir=outDir)
     pop.plotSelectPerformers(outDir, f"{c+1}")

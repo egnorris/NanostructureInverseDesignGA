@@ -2,6 +2,7 @@ import Support
 import numpy as np
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 from tensorflow import keras
 global defaultKwargs
 global keywords
@@ -91,7 +92,7 @@ class DeepLearning():
         self.multipolePredictions = np.zeros((len(self.models), nImages, len(self.wavelengths)))
         self.scatteredPowerPredictions = np.zeros((nImages, len(self.wavelengths)))
         for k in range(len(self.models)):
-            self.multipolePredictions[k, :, :] = self.models[k].predict(inputImages) ** 0.25
+            self.multipolePredictions[k, :, :] = self.models[k].predict(inputImages)
             self.scatteredPowerPredictions[:,:] += np.abs(self.multipolePredictions[k, :, :])**2
 
 

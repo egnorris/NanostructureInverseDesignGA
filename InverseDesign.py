@@ -21,11 +21,13 @@ def scale(a,x):
         
 
 class Population():
-    def __init__(self, nVertices, modelDirectory, fitnessType='gap', **kwargs):
+    def __init__(self, nVertices, modelDirectory, lambdaMin=325, lambdaMax=700, fitnessType='gap', **kwargs):
 
         #required Arguments
         self.nVertices = nVertices
         self.fitnessType = fitnessType
+        self.lambdaMin = lambdaMin
+        self.lambdaMax = lambdaMax
         #Keyword Arguments
         #Profile Generation
         self.rMin = Support.getkwarg(kwargs, defaultKwargs["rMin"], keywords["rMin"])
@@ -86,8 +88,10 @@ class Population():
             self.objImage = i0
             self.objChromosome = g.c0
             self.objScatteredPower = self.dlModels.scatteredPowerPredictions[0, :]
+            self.tss = np.var(self.objScatteredPower) * len(self.objScatteredPower)
         elif (profileType1 == None):
                 self.objScatteredPower = spectrum
+                self.tss = np.var(self.objScatteredPower) * len(self.objScatteredPower)
         
         else:
             raise Exception(f'Objective Spectrum cannot be defined')
@@ -183,85 +187,50 @@ class Population():
         print(f"mre: {self.mreScale}")
 
 
-    def getResiduals(self):
-        x = self.objScatteredPower
-        self.integral = np.zeros(self.nProfiles)
-        self.meanAbsoluteError = np.zeros(self.nProfiles)
-        self.meanRelativeError = np.zeros(self.nProfiles)
-        self.meanSquaredError = np.zeros(self.nProfiles)
-        self.rootMeanSquaredError = np.zeros(self.nProfiles)
-        for n in range(self.nProfiles):
-            y = self.scatteredPower[n, :]
-            y = y / np.max(y)
-            distance = np.zeros(len(self.wavelengths))
-            absoluteError = np.zeros(len(self.wavelengths))
-            relativeError = np.zeros(len(self.wavelengths))
-            meanSquaredError= np.zeros(len(self.wavelengths))
-            rootMeanSquaredError = np.zeros(len(self.wavelengths))
-            for w in range(len(self.wavelengths)):
-                distance[w] = np.sqrt(np.abs(x[w]**2 - y[w]**2))
-                if np.isnan(distance[w]):
-                    distance[w] = -1
-                    distance[w] = np.max(distance)
-                absoluteError[w] = np.abs(x[w] - y[w])
-                if np.isnan(absoluteError[w]):
-                    absoluteError[w] = -1
-                    absoluteError[w] = np.max(absoluteError)
-                relativeError[w] = absoluteError[w]/x[w]
-                if np.isnan(relativeError[w]):
-                    relativeError[w] = -1
-                    relativeError[w] = np.max(relativeError)
-                meanSquaredError[w] = (x[w] - y[w])**2
-                if np.isnan(meanSquaredError[w]):
-                    meanSquaredError[w] = -1
-                    meanSquaredError[w] = np.max(meanSquaredError)
-                rootMeanSquaredError[w] = (x[w] - y[w])**2
-                if np.isnan(rootMeanSquaredError[w]):
-                    rootMeanSquaredError[w] = -1
-                    rootMeanSquaredError[w] = np.max(rootMeanSquaredError)
+    def sigmoid(self, x):
+        return 1 / (1+np.exp(-x))
 
-                
-                
+    def fit(self, x, t=0, s=0.25):
 
-            self.integral[n] = np.sum(distance)
-            self.meanAbsoluteError[n] = np.mean(absoluteError)
-            self.meanRelativeError[n] = np.mean(relativeError)
-            self.meanSquaredError[n] = np.mean(meanSquaredError)
-            self.rootMeanSquaredError[n] = np.sqrt(np.mean(rootMeanSquaredError))
+        a = np.exp(np.log(s)/(-t+1))
+        b = -np.log(s)/(-t+1)
+        if x <= t:
+            return (s/self.sigmoid(t))*self.sigmoid(x)
+        else:
+            return a*np.exp(b*x)
 
-
-
-
-
-
-    
 
     def getFitness(self):
-        self.getResiduals()
 
-        if self.setScaleFlag == 'unset':
-            self.setFitnessScaling()
-            self.setScaleFlag = 'set'
-
-
-        if self.fitnessType == 'gap':
-            self.fitness = scale(self.gapScale,self.integral)
-        elif self.fitnessType == 'mse':
-            self.fitness = scale(self.mseScale,self.meanSquaredError)
-        elif self.fitnessType == 'rmse':
-            self.fitness = scale(self.rmseScale,self.rootMeanSquaredError)
-        elif self.fitnessType == 'mae':
-            self.fitness = scale(self.maeScale,self.meanAbsoluteError)
-        elif self.fitnessType == 'mre':
-            self.fitness = scale(self.mreScale,self.meanRelativeError)
-        else:
-            self.fitness = scale(self.gapScale,self.integral)
-
-        for k in range(len(self.fitness)):
-            if self.fitness[k] >= 1.0:
-                self.fitness[k] = 0.001
-
+        k0 = list(self.wavelengths).index(self.lambdaMin)
+        k1 = list(self.wavelengths).index(self.lambdaMax)
+        y = self.objScatteredPower[k0:k1]
+        self.k0 = k0
+        self.k1 = k1
         
+        self.res = np.zeros((self.nProfiles, len(y)))
+        self.sse = np.zeros(self.nProfiles)
+        self.rsse = np.zeros(self.nProfiles)
+        self.sae = np.zeros(self.nProfiles)
+        self.mse = np.zeros(self.nProfiles)
+        self.rmse = np.zeros(self.nProfiles)
+        self.mae = np.zeros(self.nProfiles)
+        self.r2 = np.zeros(self.nProfiles)
+        for n in range(self.nProfiles):
+            fx = self.scatteredPower[n, k0:k1]
+            r = self.objScatteredPower[k0:k1] - (fx)
+            self.sse[n] = np.sum(r**2)
+            self.rsse[n] = np.sqrt(self.sse[n])
+            self.sae[n] = np.sum(np.abs(r))
+            self.mse[n] = np.mean(self.sse[n])
+            self.rmse[n] = np.sqrt(self.mse[n])
+            self.mae[n] = np.mean(self.sae[n])
+            self.r2[n] = 1 - self.sse[n]/self.tss
+            self.res[n, :] = r 
+            self.fitness[n] = self.fit(self.r2[n])
+            #self.fitness[n] = self.sigmoid(self.r2[n])
+            #self.fitness[n] = self.fit(np.exp(-self.sse[n]))
+
 
 
 
@@ -308,7 +277,9 @@ class Population():
         newChromosomes = list(newChromosomes)
         newImages = np.zeros((self.nProfiles, self.dom[0], self.dom[1]))
 
-        
+        self.sortPopulation()
+        TopChromosome = self.chromosomes[0]
+        TopImage = self.images[0, :, :]
 
         n = 0
         self.nGenerated = int(self.nProfiles*growthRate)
@@ -334,17 +305,36 @@ class Population():
             newImages[n, :, :] = i1
             n += 1
 
+        #select remaining chromosomes from the previous generation via fitness proportionate selection
         for k in range(self.nRetained):
             newChromosomes[n] = self.chromosomes[self.retainedPopulation[k]]
             newImages[n, :, :] = self.images[self.retainedPopulation[k], :, :]
             n += 1
-        
+        """
+        #remaining chromosomes are the top performers from the previous generation
+        for k in range(self.nRetained):
+            newChromosomes[n] = self.chromosomes[k]
+            newImages[n, :, :] = self.images[k, :, :]
+            n += 1
+        """
         self.chromosomes = newChromosomes
         self.images = newImages
+
+        #the top chromosome from the previous generation will always occupy the last space
+        if 0 in self.retainedPopulation:
+            ''''''
+            #The top chromosomes from the previous generation is already retained
+        else:
+            #add the top chromosomes from the previous generation
+            self.chromosomes[-1] = TopChromosome
+            self.images[-1,:,:] = TopImage
+        
         self.dlModels.getModelPrediction(self.images)
         self.multipoles = self.dlModels.multipolePredictions
         self.scatteredPower = self.dlModels.scatteredPowerPredictions
         self.getFitness()
+
+        
 
     def displayParameters(self, outDir=None):
         if outDir != None:
@@ -487,110 +477,6 @@ class Population():
                     for k in range(len(self.fitness)):
                         f.write(f'{np.round(fit[k], 6)}\n')
 
-            if iGen == 0:
-                with open(f"{outDir}/GapError.txt", "w") as f:
-                    f.write("=============================================\n")
-                    f.write("Population Gap\n")
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
-                    f.write("------------------------------------\n")
-                    integral = self.integral
-                    integral = np.sort(integral)                    
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(integral[k], 6)}\n')
-            else:
-                with open(f"{outDir}/GapError.txt", "a") as f:
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
-                    f.write("------------------------------------\n")
-                    integral = self.integral
-                    integral = np.sort(integral)               
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(integral[k], 6)}\n')
-
-            if iGen == 0:
-                with open(f"{outDir}/MeanSquaredError.txt", "w") as f:
-                    f.write("=============================================\n")
-                    f.write("Population Mean Squared Error\n")
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
-                    f.write("------------------------------------\n")
-                    mse = self.meanSquaredError
-                    mse = np.sort(mse)                    
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(mse[k], 6)}\n')
-            else:
-                with open(f"{outDir}/MeanSquaredError.txt", "a") as f:
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
-                    f.write("------------------------------------\n")
-                    mse = self.meanSquaredError
-                    mse = np.sort(mse)                    
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(mse[k], 6)}\n')
-
-            if iGen == 0:
-                with open(f"{outDir}/RootMeanSquaredError.txt", "w") as f:
-                    f.write("=============================================\n")
-                    f.write("Population Root Mean Squared Error\n")
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
-                    f.write("------------------------------------\n")
-                    rmse = self.rootMeanSquaredError
-                    rmse = np.sort(rmse)
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(rmse[k], 6)}\n')
-            else:
-                with open(f"{outDir}/RootMeanSquaredError.txt", "a") as f:
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
-                    f.write("------------------------------------\n")
-                    rmse = self.rootMeanSquaredError
-                    rmse = np.sort(rmse)
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(rmse[k], 6)}\n')
-
-            if iGen == 0:
-                with open(f"{outDir}/MeanAbsoluteError.txt", "w") as f:
-                    f.write("=============================================\n")
-                    f.write("Population Mean Absolute Error\n")
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
-                    f.write("------------------------------------\n")
-                    mae = self.meanAbsoluteError
-                    mae = np.sort(mae)
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(mae[k], 6)}\n')
-            else:
-                with open(f"{outDir}/MeanAbsoluteError.txt", "a") as f:
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
-                    f.write("------------------------------------\n")
-                    mae = self.meanAbsoluteError
-                    mae = np.sort(mae)
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(mae[k], 6)}\n')
-
-            if iGen == 0:
-                with open(f"{outDir}/MeanRelativeError.txt", "w") as f:
-                    f.write("=============================================\n")
-                    f.write("Population Mean Relative Error\n")
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
-                    f.write("------------------------------------\n")
-                    mre = self.meanRelativeError
-                    mre = np.sort(mre)
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(mre[k], 6)}\n')
-            else:
-                with open(f"{outDir}/MeanRelativeError.txt", "a") as f:
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
-                    f.write("------------------------------------\n")
-                    mre = self.meanRelativeError
-                    mre = np.sort(mre)
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(mre[k], 6)}\n')
         else:
             print("Need to define output directory!")
 
@@ -610,22 +496,22 @@ class Population():
             ch[k] = self.chromosomes[sortIndices[k]]
         self.chromosomes = ch
 
-        self.integral = self.integral[sortIndices]
-        self.meanAbsoluteError = self.meanAbsoluteError[sortIndices]
-        self.meanRelativeError = self.meanRelativeError[sortIndices]
-        self.meanSquaredError = self.meanSquaredError[sortIndices]
-        self.rootMeanSquaredError = self.rootMeanSquaredError[sortIndices]
+        #self.sse = self.integral[sortIndices]
+        #self.meanAbsoluteError = self.meanAbsoluteError[sortIndices]
+        #self.meanRelativeError = self.meanRelativeError[sortIndices]
+        #self.meanSquaredError = self.meanSquaredError[sortIndices]
+        #self.rootMeanSquaredError = self.rootMeanSquaredError[sortIndices]
 
 
 
     def plotSpectrum(self, ax, idx):
-        y0 = self.scatteredPower[idx, :] / np.max(self.scatteredPower[idx, :])
-        y1 = self.objScatteredPower / np.max(self.objScatteredPower)
-        ax.set_ylim((0.5, 1.1))
+        y0 = self.scatteredPower[idx, :]
+        y1 = self.objScatteredPower
+        #ax.set_ylim((0, 1.1))
         ax.plot(self.wavelengths, y0)
         ax.scatter(self.wavelengths, y0, s=5)
         ax.plot(self.wavelengths, y1, c='black')
-        ax.fill_between(self.wavelengths, y0, y1,
+        ax.fill_between(self.wavelengths[self.k0:self.k1], y0[self.k0:self.k1], y1[self.k0:self.k1],
          color='red', alpha=0.3, label=f'fit: {np.round(self.fitness[idx], 3)}')
         ax.legend()
 

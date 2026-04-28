@@ -21,7 +21,7 @@ def scale(a,x):
         
 
 class Population():
-    def __init__(self, nVertices, modelDirectory, lambdaMin=300, lambdaMax=800, fitnessType='gap', **kwargs):
+    def __init__(self, nVertices, modelDirectory, lambdaMin=300, lambdaMax=800, fitnessType='mse', **kwargs):
 
         #required Arguments
         self.nVertices = nVertices
@@ -172,21 +172,6 @@ class Population():
         
 
 
-    def setFitnessScaling(self):
-        print("setting fitness scale")
-        self.gapScale = -np.log(0.1)/np.max(self.integral)
-        self.rmseScale = -np.log(0.1)/np.max(self.rootMeanSquaredError)
-        self.mseScale = -np.log(0.1)/np.max(self.meanSquaredError)
-        self.maeScale = -np.log(0.1)/np.max(self.meanAbsoluteError)
-        self.mreScale = -np.log(0.1)/np.max(self.meanRelativeError)
-
-        print(f"gap: {self.gapScale}")
-        print(f"rmse: {self.rmseScale}")
-        print(f"mse: {self.mseScale}")
-        print(f"mae: {self.maeScale}")
-        print(f"mre: {self.mreScale}")
-
-
     def sigmoid(self, x):
         return 1 / (1+np.exp(-x))
 
@@ -227,7 +212,16 @@ class Population():
             self.mae[n] = np.mean(self.sae[n])
             self.r2[n] = 1 - self.sse[n]/self.tss
             self.res[n, :] = r 
-            self.fitness[n] = self.fit(self.r2[n])
+            if (self.fitnessType == 'sae') or (self.fitnessType == 'mae'):
+                #1 - mean absolute error / target variance
+                self.fitness[n] = self.fit(1 - self.sae[n]/self.tss)
+            elif (self.fitnessType == 'rsse') or (self.fitnessType == 'rmse'):
+                #1 - root mean squared error / target variance
+                self.fitness[n] = self.fit(1 - self.rsse[n]/self.tss)
+            else:
+                #r squared
+                self.fitness[n] = self.fit(1 - self.sse[n]/self.tss)
+
             #self.fitness[n] = self.sigmoid(self.r2[n])
             #self.fitness[n] = self.fit(np.exp(-self.sse[n]))
 
@@ -456,34 +450,7 @@ class Population():
         print('\n')
 
 
-    def writeLoss(self, iGen, growthRate=0, outDir=None):
-        if outDir != None:
-            if iGen == 0:
-                with open(f"{outDir}/Fitness.txt", "w") as f:
-                    f.write("=============================================\n")
-                    f.write("Population Fitness\n")
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {0} - Birth Rate: n/a \n")
-                    f.write("------------------------------------\n")
-                    fit = self.fitness
-                    fit = np.sort(fit)
-                    fit = np.flip(fit)
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(fit[k], 6)}\n')
-            else:
-                with open(f"{outDir}/Fitness.txt", "a") as f:
-                    f.write("------------------------------------\n")
-                    f.write(f"Generation: {iGen} - Birth Rate: {np.round(2*growthRate, 2)}\n")
-                    f.write("------------------------------------\n")
-                    fit = self.fitness
-                    fit = np.sort(fit)
-                    fit = np.flip(fit)
-                    for k in range(len(self.fitness)):
-                        f.write(f'{np.round(fit[k], 6)}\n')
-
-        else:
-            print("Need to define output directory!")
-
+    
     def sortPopulation(self):
         sortIndices = np.argsort(self.fitness)
         sortIndices = np.flip(sortIndices)
@@ -500,24 +467,82 @@ class Population():
             ch[k] = self.chromosomes[sortIndices[k]]
         self.chromosomes = ch
 
-        #self.sse = self.integral[sortIndices]
-        #self.meanAbsoluteError = self.meanAbsoluteError[sortIndices]
-        #self.meanRelativeError = self.meanRelativeError[sortIndices]
-        #self.meanSquaredError = self.meanSquaredError[sortIndices]
-        #self.rootMeanSquaredError = self.rootMeanSquaredError[sortIndices]
+        self.res = self.res[sortIndices, :]
+        self.sse = self.sse[sortIndices]
+        self.rsse = self.rsse[sortIndices]
+        self.sae = self.sae[sortIndices]
+        self.mse = self.mse[sortIndices]
+        self.rmse = self.rmse[sortIndices]
+        self.mae = self.mae[sortIndices]
+        self.r2 = self.r2[sortIndices]
+
 
 
 
     def plotSpectrum(self, ax, idx):
         y0 = self.scatteredPower[idx, :]
         y1 = self.objScatteredPower
-        #ax.set_ylim((0, 1.1))
+        r = self.res[idx, :]
+        truncWavelengths = self.wavelengths[self.k0:self.k1]
+        truncy0 = y0[self.k0:self.k1]
+        ax.set_xlim((300,800))
+        
+        ax.set_ylim((0, np.min([1.1, 1.5*np.max(y1)])))
+        ax.plot([self.wavelengths[self.k0], self.wavelengths[self.k0]], [0, 2], c= 'black', alpha = 0.5)
+        ax.plot([self.wavelengths[self.k1-1], self.wavelengths[self.k1-1]], [0, 2], c= 'black', alpha = 0.5)
         ax.plot(self.wavelengths, y0)
-        ax.scatter(self.wavelengths, y0, s=5)
+        ax.scatter(self.wavelengths, y0, s=5, c='tab:blue')
         ax.plot(self.wavelengths, y1, c='black')
-        ax.fill_between(self.wavelengths[self.k0:self.k1], y0[self.k0:self.k1], y1[self.k0:self.k1],
-         color='red', alpha=0.3, label=f'fit: {np.round(self.fitness[idx], 4)}')
-        ax.legend(loc='upper right')
+        
+        #ax.errorbar(truncWavelengths, truncy0, yerr=r**2, zorder=-1, c='cornflowerblue')
+        
+        #ax.fill_between(self.wavelengths[self.k0:self.k1], y0[self.k0:self.k1], y1[self.k0:self.k1],
+        # color='red', alpha=0.3, label=f'$r^2$: {np.round(self.r2[idx], 4)}')
+
+
+        ax.fill_between(truncWavelengths, truncy0, truncy0+np.abs(r)*np.sign(r),
+            color='cornflowerblue', alpha=0.3, label=f'sae: {np.round(self.sae[idx], 3)}')
+
+        ax.fill_between(truncWavelengths, truncy0, truncy0+(r**2)*np.sign(r),
+            color='red', alpha=0.3, label=f'sse: {np.round(self.sse[idx], 3)}')
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2),ncols=2)
+
+    def writeFile(self, outDir=None, fName=None):
+        self.sortPopulation()
+        c = 1
+        w = self.k0
+        d = {
+            "Profile Rank": np.linspace(0,self.nProfiles-1,self.nProfiles, dtype='int'),
+            "Wavelength": int(self.wavelengths[w]) * np.ones(self.nProfiles, dtype='int'),
+                "Residual": np.round(self.res[:, c], 4),
+                "Sum of Squares Error": np.round(self.sse, 4),
+                "Root Sum of Squares Error": np.round(self.rsse, 4),
+                "Sum of Absolute Errors": np.round(self.sae, 4),
+                "Mean Squared Error": np.round(self.mse, 4),
+                "Root Mean Squared Error": np.round(self.rmse, 4),
+                "Mean Absolute Error": np.round(self.mae, 4),
+                "Coefficient of Determination": np.round(self.r2, 4),
+            }
+        df = pd.DataFrame(data=d)
+
+        c = 1
+        for w in range(self.k0+1, self.k1):
+            d = {
+                "Profile Rank": np.linspace(0,self.nProfiles-1,self.nProfiles, dtype='int'),
+                "Wavelength": int(self.wavelengths[w]) * np.ones(self.nProfiles, dtype='int'),
+                "Residual": np.round(self.res[:, c], 4),
+                "Sum of Squares Error": np.round(self.sse, 4),
+                "Root Sum of Squares Error": np.round(self.rsse, 4),
+                "Sum of Absolute Errors": np.round(self.sae, 4),
+                "Mean Squared Error": np.round(self.mse, 4),
+                "Root Mean Squared Error": np.round(self.rmse, 4),
+                "Mean Absolute Error": np.round(self.mae, 4),
+                "Coefficient of Determination": np.round(self.r2, 4),
+                }
+            df = pd.concat([df, pd.DataFrame(data=d)], ignore_index=True)
+            c+= 1
+
+        df.to_csv(f"{outDir}/{fName}.csv")
 
 
     def plotSelectPerformers(self, outDir=None, fName=None):

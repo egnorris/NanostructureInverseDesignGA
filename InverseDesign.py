@@ -21,7 +21,7 @@ def scale(a,x):
         
 
 class Population():
-    def __init__(self, nVertices, modelDirectory, lambdaMin=300, lambdaMax=800, fitnessType='mse', **kwargs):
+    def __init__(self, nVertices, modelDirectory, lambdaMin=300, lambdaMax=800, fitnessType=[1,0,1], **kwargs):
 
         #required Arguments
         self.nVertices = nVertices
@@ -121,26 +121,40 @@ class Population():
         self.wavelengths = np.linspace(300,800,101)
         self.multipoles = np.zeros((int(len(self.l)*len(self.f)), nProfiles, len(self.wavelengths)))
         self.scatteredPower = np.zeros((nProfiles, 101))
+        self.serialNumber = np.zeros(nProfiles)
 
         self.nProfiles = nProfiles
         self.nT = nT; self.nR = nR; self.nC = nC; self.nF = nF; self.nP = nP
+
+        self.nShapesGenerated = 0
 
         n = 0
         for k in range(nT):
             self.profGen.generate('tri')
             self.images[n, :, :] = self.profGen.smoothedImage
             self.chromosomes[n] = self.profGen.binaryPolygon
+            self.serialNumber[n] = self.nShapesGenerated
+            self.nShapesGenerated += 1
             n += 1
+            
+
+            
         for k in range(nR):
             self.profGen.generate('rec')
             self.images[n, :, :] = self.profGen.smoothedImage
             self.chromosomes[n] = self.profGen.binaryPolygon
+            self.serialNumber[n] = self.nShapesGenerated
+            self.nShapesGenerated += 1
             n += 1
+
         for k in range(nC):
             self.profGen.generate('cir')
             self.images[n, :, :] = self.profGen.smoothedImage
             self.chromosomes[n] = self.profGen.binaryPolygon
+            self.serialNumber[n] = self.nShapesGenerated
+            self.nShapesGenerated += 1
             n += 1
+
         for k in range(nF):
             if termsF == None:
                 self.profGen.fourierGenerator(np.random.randint(2,4))
@@ -154,12 +168,17 @@ class Population():
                 self.profGen.encodePolygon()
                 self.images[n, :, :] = self.profGen.smoothedImage
                 self.chromosomes[n] = self.profGen.binaryPolygon
-
+            
+            self.serialNumber[n] = self.nShapesGenerated
+            self.nShapesGenerated += 1
             n += 1
+
         for k in range(nP):
             self.profGen.generate('pol')
             self.images[n, :, :] = self.profGen.smoothedImage
             self.chromosomes[n] = self.profGen.binaryPolygon
+            self.serialNumber[n] = self.nShapesGenerated
+            self.nShapesGenerated += 1
             n += 1
 
             
@@ -212,18 +231,17 @@ class Population():
             self.mae[n] = np.mean(self.sae[n])
             self.r2[n] = 1 - self.sse[n]/self.tss
             self.res[n, :] = r 
-            if (self.fitnessType == 'sae') or (self.fitnessType == 'mae'):
-                #1 - mean absolute error / target variance
-                self.fitness[n] = self.fit(1 - self.sae[n]/self.tss)
-            elif (self.fitnessType == 'rsse') or (self.fitnessType == 'rmse'):
-                #1 - root mean squared error / target variance
-                self.fitness[n] = self.fit(1 - self.rsse[n]/self.tss)
-            else:
-                #r squared
-                self.fitness[n] = self.fit(1 - self.sse[n]/self.tss)
+            
 
+            saeFitness = self.fit(1 - self.sae[n]/self.tss)
+            sseFitness = self.fit(1 - self.sse[n]/self.tss)
+            rsseFitness = self.fit(1 - self.rsse[n]/self.tss)
+            weights = self.fitnessType
+            #fitness is a weighted average of sae and sse Realizations of fitness
+            self.fitness[n] = (weights[0]*saeFitness + weights[1]*rsseFitness + weights[2]*sseFitness)/np.sum(weights)
             #self.fitness[n] = self.sigmoid(self.r2[n])
             #self.fitness[n] = self.fit(np.exp(-self.sse[n]))
+
 
 
 
@@ -270,10 +288,12 @@ class Population():
         newChromosomes = np.zeros(self.nProfiles)
         newChromosomes = list(newChromosomes)
         newImages = np.zeros((self.nProfiles, self.dom[0], self.dom[1]))
+        newSerialNumbers = np.zeros(self.nProfiles)
 
         self.sortPopulation()
         TopChromosome = self.chromosomes[0]
         TopImage = self.images[0, :, :]
+        TopSerialNumber = self.serialNumber[0]
 
         n = 0
         self.nGenerated = int(self.nProfiles*growthRate)
@@ -294,15 +314,21 @@ class Population():
 
             newChromosomes[n] = g.c0
             newImages[n, :, :] = i0
+            newSerialNumbers[n] = self.nShapesGenerated
+            self.nShapesGenerated += 1
             n += 1
+
             newChromosomes[n] = g.c1
             newImages[n, :, :] = i1
+            newSerialNumbers[n] = self.nShapesGenerated
+            self.nShapesGenerated += 1
             n += 1
 
         #select remaining chromosomes from the previous generation via fitness proportionate selection
         for k in range(self.nRetained):
             newChromosomes[n] = self.chromosomes[self.retainedPopulation[k]]
             newImages[n, :, :] = self.images[self.retainedPopulation[k], :, :]
+            newSerialNumbers[n] = self.serialNumber[k]
             n += 1
         """
         #remaining chromosomes are the top performers from the previous generation
@@ -313,6 +339,7 @@ class Population():
         """
         self.chromosomes = newChromosomes
         self.images = newImages
+        self.serialNumber = newSerialNumbers
 
         #the top chromosome from the previous generation will always occupy the last space
         if 0 in self.retainedPopulation:
@@ -322,6 +349,7 @@ class Population():
             #add the top chromosomes from the previous generation
             self.chromosomes[-1] = TopChromosome
             self.images[-1,:,:] = TopImage
+            self.serialNumber[-1] = TopSerialNumber
         
         previousBestFitness = self.fitness[0]
         self.dlModels.getModelPrediction(self.images)
@@ -361,7 +389,7 @@ class Population():
                 f.write("--------------------------------------------------------------------------\n")
                 f.write(f"Parent chromosomes are split into {self.cP} crossover points\n")
                 f.write(f"New chromosomes have {int(len(self.chromosomes[0])*self.mR)} mutations\n")
-                f.write(f"Fitness is calculated from {self.fitnessType}\n")
+                #f.write(f"Fitness is calculated from {self.fitnessType}\n")
                 f.write("--------------------------------------------------------------------------\n")
                 f.write("Neural Network Parameters\n")
                 f.write("--------------------------------------------------------------------------\n")
@@ -475,6 +503,7 @@ class Population():
         self.rmse = self.rmse[sortIndices]
         self.mae = self.mae[sortIndices]
         self.r2 = self.r2[sortIndices]
+        self.serialNumber = self.serialNumber[sortIndices]
 
 
 
@@ -507,12 +536,14 @@ class Population():
             color='red', alpha=0.3, label=f'sse: {np.round(self.sse[idx], 3)}')
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2),ncols=2)
 
-    def writeFile(self, outDir=None, fName=None):
+    def writeFile(self, outDir=None, fName=None, gen=0):
         self.sortPopulation()
         c = 1
         w = self.k0
         d = {
+            "Generation": int(gen)*np.ones(self.nProfiles, dtype='int'),
             "Profile Rank": np.linspace(0,self.nProfiles-1,self.nProfiles, dtype='int'),
+            "Serial Number": self.serialNumber,
             "Wavelength": int(self.wavelengths[w]) * np.ones(self.nProfiles, dtype='int'),
                 "Residual": np.round(self.res[:, c], 4),
                 "Sum of Squares Error": np.round(self.sse, 4),
@@ -528,7 +559,9 @@ class Population():
         c = 1
         for w in range(self.k0+1, self.k1):
             d = {
+                "Generation": int(gen)*np.ones(self.nProfiles, dtype='int'),
                 "Profile Rank": np.linspace(0,self.nProfiles-1,self.nProfiles, dtype='int'),
+                "Serial Number": self.serialNumber,
                 "Wavelength": int(self.wavelengths[w]) * np.ones(self.nProfiles, dtype='int'),
                 "Residual": np.round(self.res[:, c], 4),
                 "Sum of Squares Error": np.round(self.sse, 4),
@@ -579,7 +612,7 @@ class Population():
         axs[2,1].set_xlabel("Wavelength (nm)")
         axs[2,2].set_xlabel("Wavelength (nm)")
         
-        f.suptitle(f"{self.fitnessType} Fit - Generation {fName} - Top 6 Performers")
+        f.suptitle(f"{self.fitnessType[0]}:{self.fitnessType[2]} Fitness - Generation {fName} - Top 6 Performers")
         plt.tight_layout()
         plt.savefig(f"{outDir}/gen{fName}TopPerformers.png")
         plt.close()
@@ -612,7 +645,7 @@ class Population():
         axs[2,1].set_xlabel("Wavelength (nm)")
         axs[2,2].set_xlabel("Wavelength (nm)")
         
-        f.suptitle(f"{self.fitnessType} Fit - Generation {fName} - Bottom 6 Performers")
+        f.suptitle(f"{self.fitnessType[0]}:{self.fitnessType[2]} Fitness - Generation {fName} - Bottom 6 Performers")
         plt.tight_layout()
         plt.savefig(f"{outDir}/gen{fName}BottomPerformers.png")
         plt.close()

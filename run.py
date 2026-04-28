@@ -37,15 +37,8 @@ def loadExistingTarget(kwargs):
     y = np.loadtxt(kwargs['targetPath'])
     return y 
 
-def saveTopPerformers(kwargs, pop):
-    pop.sortPopulation()
-    for k in range(kwargs['numSave']):
-        temp = {
-            "Profile":  pop.images[k, :, :],
-            "Fitness": pop.fitness[k],
-            "Scattered Power": pop.scatteredPower[k, :]}
 
-        topPerformersDict[f'G{0}-{k}'] = temp
+
 
 
 parser = argparse.ArgumentParser(description="Run Genetic Algorithm Inverse Design")
@@ -194,17 +187,22 @@ try:
 except FileExistsError:
     print(f"Directory: {outDir} Exists")
 
-global topPerformersDict
-topPerformersDict = {}
 
 
-with open(f"{outDir}/{outDir}.log", 'w') as f:
+
+with open(f"{outDir}/Simulation.log", 'w') as f:
     f.write(f"{outDir} Log\n")
 
+if kwargs['fitnessType'] == 'mse':
+    weights = [3, 0, 1]
+if kwargs['fitnessType'] == 'rmse':
+    weights = [1, 2, 1]
+else:
+    weights = [1, 0, 3]
 #Initialize Population
 pop = InverseDesign.Population(
     nVertices=kwargs['nV'],
-    fitnessType=kwargs['fitnessType'],
+    fitnessType=weights,
     modelDirectory=kwargs['modelDirectory'],
     lambdaMin=kwargs['minLambda'],
     lambdaMax=kwargs['maxLambda'],
@@ -229,36 +227,70 @@ pop.initialize(
     nP=kwargs['nP'],
     nF=kwargs['nF'])
 
-saveTopPerformers(kwargs, pop)
+
+
+
 pop.plotSelectPerformers(outDir, f"0")
 print(pop.nProfiles)
-pop.writeFile(outDir, f"gen0Error")
+pop.writeFile(outDir, "errorGen0", 0)
 
 
 nGenerations = kwargs['numGenerations']
 endCondition = -1
 topFitness = np.max(pop.fitness)
 
+
+global topPerformersDict
+global savedSerialNumbers
+topPerformersDict = {}
+savedSerialNumbers = []
+
+j = 0
+n = 0
+while n < kwargs['numSave']:
+    sn = pop.serialNumber[j]
+    while sn in savedSerialNumbers:
+        print(f"Profile {int(sn)} is already saved")
+        j+= 1
+        sn = pop.serialNumber[j]
+    
+    print(f"Saving Profile {int(sn)}")
+    d = {
+        "sse": pop.sse[j],
+        "sae": pop.sae[j],
+        "profile": pop.images[j,:,:],
+        "sn": int(sn),
+        "rank": int(j+1),
+        "fit": pop.fitness[j]}
+    topPerformersDict[f"Gen{0}-{n}"] = d
+    savedSerialNumbers.append(int(sn))
+    j+=1
+    n+=1
+
+
+
+
 gap = 1
 gapLimit = kwargs['gapLim']
-endCondition = kwargs['fitLim']
+fitLimit = kwargs['fitLim']
+#print(f"Serial Numbers: {pop.serialNumber}")
 
-print(f"Evolution will terminate after {gapLimit} generations with no improvement if the top fitness is > {endCondition}")
+print(f"Evolution will terminate after {gapLimit} generations with no improvement or if the top Coefficent of Determination is > {fitLimit}")
 for c in range(nGenerations):
     print(f"Generation {c+1}")
-    with open(f"{outDir}/{outDir}.log", 'a') as f:
+    with open(f"{outDir}/Simulation.log", 'a') as f:
         f.write(f"Generation {c+1}\n")
     birthRate = 0.5
     pop.newGeneration(birthRate)
     #pop.writeLoss(iGen=c+1, growthRate=birthRate, outDir=outDir)
     pop.plotSelectPerformers(outDir, f"{c+1}")
-    saveTopPerformers(kwargs, pop)
-    pop.writeFile(outDir, f"gen{c}Error")
+
+    pop.writeFile(outDir, f"errorGen{c+1}", c+1)
     if np.max(pop.fitness) > topFitness:
         pop.sortPopulation()
         if gap == 1:
             print(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generation.")
-            with open(f"{outDir}/{outDir}.log", 'a') as f:
+            with open(f"{outDir}/Simulation.log", 'a') as f:
                 f.write(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generation.\n")
                 f.write(f"mse: {np.round(pop.mse[0], 5)}\n")
                 f.write(f"rmse: {np.round(pop.rmse[0], 5)}\n")
@@ -269,7 +301,7 @@ for c in range(nGenerations):
                 f.write(f"r squared: {np.round(pop.r2[0], 5)}\n")
         else:
             print(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generations.")
-            with open(f"{outDir}/{outDir}.log", 'a') as f:
+            with open(f"{outDir}/Simulation.log", 'a') as f:
                 f.write(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generations.\n")
                 f.write(f"Top Perfomer Error:\n")
                 f.write(f"  mse: {np.round(pop.mse[0], 5)}\n")
@@ -282,28 +314,48 @@ for c in range(nGenerations):
         topFitness = np.max(pop.fitness)
         gap = 0
 
-    if (gap > gapLimit) and (np.max(pop.r2) >= endCondition):
-        print(f"Top r squared > {endCondition} and no fitness improvement in {gapLimit} generations")
+    if (gap > gapLimit):
+        print(f"No fitness improvement in {gapLimit} generations")
         print(f"Evolution Conlcuded after {c+1} Generations")
-        with open(f"{outDir}/{outDir}.log", 'a') as f:
-            f.write(f"Evolution Conlcuded after {c+1} Generations\n")
-        
-        break
-    elif (gap > gapLimit) and (np.max(pop.r2) < endCondition):
-        print(f"No fitness improvement in {gapLimit} generations but end Conditions not met: Top r squared < {endCondition}")
-    elif (np.max(pop.r2) > 0.995):
-        print(f"Top r squared > {0.995} - Evolution Conlcuded after {c+1} Generations")
-        with open(f"{outDir}/{outDir}.log", 'a') as f:
+        with open(f"{outDir}/Simulation.log", 'a') as f:
             f.write(f"Evolution Conlcuded after {c+1} Generations\n")
         break
+    elif (np.max(pop.r2) > kwargs['fitLim']):
+        print(f"Top Coefficent of Determination: {np.round(pop.r2[0], 5)} > {kwargs['fitLim']} - Evolution Conlcuded after {c+1} Generations")
+        with open(f"{outDir}/Simulation.log", 'a') as f:
+            f.write(f"Evolution Conlcuded after {c+1} Generations\n")
+        break
+
     if c+1 == nGenerations:
         print("Generation Limit Reached")
-        with open(f"{outDir}/{outDir}.log", 'a') as f:
+        with open(f"{outDir}/Simulation.log", 'a') as f:
             f.write(f"Evolution Conlcuded after {c+1} Generations\n")
+    
     gap += 1
+    j = 0
+    n = 0
+    while n < kwargs['numSave']:
+        sn = pop.serialNumber[j]
+        while sn in savedSerialNumbers:
+            #print(f"Profile {int(sn)} is already saved")
+            j+= 1
+            sn = pop.serialNumber[j]
+        
+        #print(f"Saving Profile {int(sn)}")
+        d = {
+            "sse": pop.sse[j],
+            "sae": pop.sae[j],
+            "profile": pop.images[j,:,:],
+            "sn": int(sn),
+            "rank": int(j+1),
+            "fit": pop.fitness[j]}
+        topPerformersDict[f"Gen{c+1}-{n}"] = d
+        savedSerialNumbers.append(int(sn))
+        j+=1
+        n+=1
         
     
-with open(f"{outDir}/{outDir}.log", 'a') as f:
+with open(f"{outDir}/Simulation.log", 'a') as f:
     f.write(f"Final Generation Average Error:\n")
     f.write(f"  mse: {np.round(np.mean(pop.mse), 5)}\n")
     f.write(f"  rmse: {np.round(np.mean(pop.rmse), 5)}\n")
@@ -314,4 +366,12 @@ with open(f"{outDir}/{outDir}.log", 'a') as f:
     f.write(f"  r squared: {np.round(np.mean(pop.r2), 5)}\n")
 
 
+
+df = pd.read_csv(f"{outDir}/errorGen{0}.csv")
+for i in range(c+1):
+    df = pd.concat([df, pd.read_csv(f"{outDir}/errorGen{i+1}.csv")], ignore_index=True)
+
+
+
+df.to_csv(f"{outDir}/errorAllGen.csv")
 savemat(f"{outDir}/TopPerformers-{kwargs['fitnessType']}.mat", topPerformersDict)

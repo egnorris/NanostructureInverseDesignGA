@@ -59,7 +59,7 @@ parser.add_argument('-tg', '--targetGeneration', type=str, default=None,
     help="If a new target scattered power spectrum is desired define what type of shape to generate it from; \nAllowed Arguments: 'tri', 'cir', 'rec', 'pol'")
 
 #Parameters with a default value
-parser.add_argument('-ft', '--fitnessType', type = str, required=False, default='rmse',
+parser.add_argument('-ft', '--fitnessType', type = str, required=False, default='sse',
     help="Set what type of error to use when calculating fitness; \nAllowed Arguments: 'rmse', 'mse', 'mre', 'mae', 'gap'; \nDefault: 'rmse'")
 parser.add_argument('-ng', '--numGenerations', type = int, required=False, default=25,
     help="Define the number of generations to run the algorithm for; \nDefault: 25")
@@ -115,6 +115,17 @@ parser.add_argument('-m' , required=False, default = [1,1,2],
 parser.add_argument('-f' , required=False, default = ['E','H'],
     help="")
 
+parser.add_argument('-gL', '--gapLim' , required=False, type=int, default = 15,
+    help="")
+parser.add_argument('-fL', '--fitLim' , required=False, type=float, default = 0.995,
+    help="")
+
+parser.add_argument('-l0', '--minLambda' , required=False, type=float, default = 300,
+    help="")
+
+parser.add_argument('-l1', '--maxLambda' , required=False, type=float, default = 800,
+    help="")
+
 #Optional Parameters
 parser.add_argument('-seed', '--seed', type = int, required=False, default=None,
     help="Define a seed for the random number generator if desired.")
@@ -160,10 +171,10 @@ if kwargs['targetGeneration'] != None:
     else:
         raise Exception(f"{kwargs['targetGeneration']} is not valid for --targetGeneration/-tg \nAllowed Arguments: 'tri', 'cir', 'rec', 'pol'")
 
-if kwargs['fitnessType'] in ['rmse', 'mse', 'mre', 'mae', 'gap']:
+if kwargs['fitnessType'] in ['mse', 'mae', 'rmse']:
     ''
 else:
-    raise Exception(f"{kwargs['fitnessType']} is not valid for --fitnessType/-ft \nAllowed Arguments: 'rmse', 'mse', 'mre', 'mae', 'gap'; \nDefault: 'rmse'")
+    raise Exception(f"{kwargs['fitnessType']} is not valid for --fitnessType/-ft \nAllowed Arguments: 'mse', 'mae', 'rmse'; \nDefault: 'rmse'")
 
 
 
@@ -187,13 +198,16 @@ global topPerformersDict
 topPerformersDict = {}
 
 
+with open(f"{outDir}/{outDir}.log", 'w') as f:
+    f.write(f"{outDir} Log\n")
+
 #Initialize Population
 pop = InverseDesign.Population(
     nVertices=kwargs['nV'],
     fitnessType=kwargs['fitnessType'],
     modelDirectory=kwargs['modelDirectory'],
-    lambdaMin=325,
-    lambdaMax=700,
+    lambdaMin=kwargs['minLambda'],
+    lambdaMax=kwargs['maxLambda'],
     rMin=kwargs['rMin'],
     rMax=kwargs['rMax'],
     d=(180,180),
@@ -218,6 +232,7 @@ pop.initialize(
 saveTopPerformers(kwargs, pop)
 pop.plotSelectPerformers(outDir, f"0")
 print(pop.nProfiles)
+pop.writeFile(outDir, f"gen0Error")
 
 
 nGenerations = kwargs['numGenerations']
@@ -225,39 +240,78 @@ endCondition = -1
 topFitness = np.max(pop.fitness)
 
 gap = 1
-gapLimit = int(0.25*nGenerations) + 1
-endCondition = 0.995
+gapLimit = kwargs['gapLim']
+endCondition = kwargs['fitLim']
 
 print(f"Evolution will terminate after {gapLimit} generations with no improvement if the top fitness is > {endCondition}")
 for c in range(nGenerations):
     print(f"Generation {c+1}")
-    birthRate = 0.45
+    with open(f"{outDir}/{outDir}.log", 'a') as f:
+        f.write(f"Generation {c+1}\n")
+    birthRate = 0.5
     pop.newGeneration(birthRate)
-    pop.writeLoss(iGen=c+1, growthRate=birthRate, outDir=outDir)
+    #pop.writeLoss(iGen=c+1, growthRate=birthRate, outDir=outDir)
     pop.plotSelectPerformers(outDir, f"{c+1}")
     saveTopPerformers(kwargs, pop)
-    
+    pop.writeFile(outDir, f"gen{c}Error")
     if np.max(pop.fitness) > topFitness:
+        pop.sortPopulation()
         if gap == 1:
             print(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generation.")
+            with open(f"{outDir}/{outDir}.log", 'a') as f:
+                f.write(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generation.\n")
+                f.write(f"mse: {np.round(pop.mse[0], 5)}\n")
+                f.write(f"rmse: {np.round(pop.rmse[0], 5)}\n")
+                f.write(f"mae: {np.round(pop.mae[0], 5)}\n")
+                f.write(f"sse: {np.round(pop.sse[0], 5)}\n")
+                f.write(f"rsse: {np.round(pop.rsse[0], 5)}\n")
+                f.write(f"sae: {np.round(pop.sae[0], 5)}\n")
+                f.write(f"r squared: {np.round(pop.r2[0], 5)}\n")
         else:
             print(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generations.")
+            with open(f"{outDir}/{outDir}.log", 'a') as f:
+                f.write(f"Top fitness has Improved to {np.round(np.max(pop.fitness), 4)} found after {gap} Generations.\n")
+                f.write(f"Top Perfomer Error:\n")
+                f.write(f"  mse: {np.round(pop.mse[0], 5)}\n")
+                f.write(f"  rmse: {np.round(pop.rmse[0], 5)}\n")
+                f.write(f"  mae: {np.round(pop.mae[0], 5)}\n")
+                f.write(f"  sse: {np.round(pop.sse[0], 5)}\n")
+                f.write(f"  rsse: {np.round(pop.rsse[0], 5)}\n")
+                f.write(f"  sae: {np.round(pop.sae[0], 5)}\n")
+                f.write(f"  r squared: {np.round(pop.r2[0], 5)}\n")
         topFitness = np.max(pop.fitness)
         gap = 0
 
-    if (gap > gapLimit) and (np.max(pop.fitness) >= endCondition):
-        print(f"Top Fitness > {endCondition} and no fitness improvement in {gapLimit} generations")
+    if (gap > gapLimit) and (np.max(pop.r2) >= endCondition):
+        print(f"Top r squared > {endCondition} and no fitness improvement in {gapLimit} generations")
         print(f"Evolution Conlcuded after {c+1} Generations")
+        with open(f"{outDir}/{outDir}.log", 'a') as f:
+            f.write(f"Evolution Conlcuded after {c+1} Generations\n")
+        
         break
-    elif (gap > gapLimit) and (np.max(pop.fitness) < endCondition):
-        print(f"No fitness improvement in {gapLimit} generations but end Conditions not met: Top Fitness < {endCondition}")
+    elif (gap > gapLimit) and (np.max(pop.r2) < endCondition):
+        print(f"No fitness improvement in {gapLimit} generations but end Conditions not met: Top r squared < {endCondition}")
+    elif (np.max(pop.r2) > 0.995):
+        print(f"Top r squared > {0.995} - Evolution Conlcuded after {c+1} Generations")
+        with open(f"{outDir}/{outDir}.log", 'a') as f:
+            f.write(f"Evolution Conlcuded after {c+1} Generations\n")
+        break
     if c+1 == nGenerations:
         print("Generation Limit Reached")
+        with open(f"{outDir}/{outDir}.log", 'a') as f:
+            f.write(f"Evolution Conlcuded after {c+1} Generations\n")
     gap += 1
         
     
-    
-    
+with open(f"{outDir}/{outDir}.log", 'a') as f:
+    f.write(f"Final Generation Average Error:\n")
+    f.write(f"  mse: {np.round(np.mean(pop.mse), 5)}\n")
+    f.write(f"  rmse: {np.round(np.mean(pop.rmse), 5)}\n")
+    f.write(f"  mae: {np.round(np.mean(pop.mae), 5)}\n")
+    f.write(f"  sse: {np.round(np.mean(pop.sse), 5)}\n")
+    f.write(f"  rsse: {np.round(np.mean(pop.rsse), 5)}\n")
+    f.write(f"  sae: {np.round(np.mean(pop.sae), 5)}\n")
+    f.write(f"  r squared: {np.round(np.mean(pop.r2), 5)}\n")
 
 
 savemat(f"{outDir}/TopPerformers-{kwargs['fitnessType']}.mat", topPerformersDict)

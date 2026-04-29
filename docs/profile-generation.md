@@ -7,7 +7,7 @@ This module primarily houses the ProfileGeneration() class which manages everyth
 * Binary encoded string
 * Image array
 
-## Radial Paramterization
+## Radial Parameterization
 
 In the context of the downstream genetic algorithm these geometry profiles describe different realization of parameter space. An example profile geometry is shown below:
 

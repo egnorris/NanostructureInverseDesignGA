@@ -1,17 +1,27 @@
-# Welcome to MkDocs
+# About
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
 
-## Commands
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+## Project Filesystem
 
-## Project layout
-
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+    mkdocs.yml                      # Configuration file for mkdocs
+    docs/                           # Folder containing mkdocs pages
+        index.md                    
+        deep-learning.md            
+        genetic-operations.md       
+        inverse-design.md           
+        profile-generation.md       
+        support.md                  
+        ...                         # Other markdown pages, images and other files.
+    modules/                        
+        DeepLearning.py             
+        GeneticOperations.py        
+        InverseDesign.py            
+        ProfileGeneration.py        
+        Support.py                  
+    testing/                        
+        run.py                      
+        testing.sh                  
+        input/                      #Folder Containing input files for run.py
+            objScatteredPower...    
+        output/                     #Folder Containing output files from run.py

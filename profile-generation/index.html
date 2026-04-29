@@ -95,7 +95,7 @@
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#radial-paramterization" class="nav-link">Radial Paramterization</a>
+            <li class="nav-item" data-bs-level="2"><a href="#radial-parameterization" class="nav-link">Radial Parameterization</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -123,9 +123,9 @@
 <li>Binary encoded string</li>
 <li>Image array</li>
 </ul>
-<h2 id="radial-paramterization">Radial Paramterization</h2>
+<h2 id="radial-parameterization">Radial Parameterization</h2>
 <p>In the context of the downstream genetic algorithm these geometry profiles describe different realization of parameter space. An example profile geometry is shown below:</p>
-<p><img src="/images/polygonParamterizationDiagram.png" alt="drawing" width="300"/></p>
+<p><img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/polygonParamterizationDiagram.png?raw=true" alt="drawing" width="300"/></p>
 <p>each red dot indicates an individual element of a profile in polar coordinates, represented as an ordered pair, <span class="arithmatex">\((\theta_n,r_n)\)</span> where <span class="arithmatex">\(r_n\)</span> is the point along the line cast from the center to the edge of the domain that intersects with the polygon, this realization of the polygon is refered to as the "radial parameterization" later on</p>
 <h2 id="binary-representation">Binary Representation</h2>
 <p>in the genetic operations expect profiles to be in a binary representation, that conversion is handled in this module with encodePolygon() and the binary representation can be decoded back to the radial form with decodePolygon() </p>
@@ -236,7 +236,7 @@ self.arrayImage = grid_points_in_poly(self.dom, self.cartPolygon).astype(int)
 self.smoothedImage = np.round(self.smoothedImage / np.max(self.smoothedImage))
 </code></pre>
 <p>this smoothing results in the polygon edges acting more like splines to guide the nanostructure profile shape but still act as a reliable parameterization of the nanostructure. </p>
-<p><img src="/images/polygonSmoothing.png" alt="drawing" width="900"/></p>
+<p><img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/polygonSmoothing.png?raw=true" alt="drawing" width="900"/></p>
 <pre><code class="language-python">import sys
 
 sys.path.append(&quot;../modules&quot;)

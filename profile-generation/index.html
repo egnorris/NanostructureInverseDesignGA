@@ -111,6 +111,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#example-testing-code" class="nav-link">Example Testing Code</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
               </ul>
             </li>
         </ul>
@@ -264,6 +268,7 @@ self.r[v] = np.sqrt(x**2 + y**2)
 </code></pre>
 <p>an alternative method for polygon generation is to build a fourier series with random weights such that <span class="arithmatex">\(R(0) = R(2\pi)\)</span> the structure of these shapes is highly dependent on the number of terms, if only one term is used the same circle will always be drawn and if too many terms are used (more than 5) the shape generated isn't quite useable</p>
 <p><img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/fourierPolygons.png?raw=true" alt="drawing" width="900"/></p>
+<p>In the above image the affect of increasing terms is demonstrated more than five terms will generally results in profiles that are quite short and increasingly wide along the right hand side.</p>
 <h2 id="binary-representation">Binary Representation</h2>
 <p>in the genetic operations expect profiles to be in a binary representation, that conversion is handled in this module with encodePolygon() and the binary representation can be decoded back to the radial form with decodePolygon() </p>
 <pre><code class="language-Python">def encodePolygon(self):
@@ -374,11 +379,70 @@ self.smoothedImage = np.round(self.smoothedImage / np.max(self.smoothedImage))
 </code></pre>
 <p>this smoothing results in the polygon edges acting more like splines to guide the nanostructure profile shape but still act as a reliable parameterization of the nanostructure. </p>
 <p><img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/polygonSmoothing.png?raw=true" alt="drawing" width="900"/></p>
-<pre><code class="language-python">import sys
+<h2 id="example-testing-code">Example Testing Code</h2>
+<pre><code class="language-python">#Example of using ProfileGeneration.py to generate a triangular polygon
+#/testing/generationTriangle.py
+import sys
+import matplotlib.pyplot as plt
 
 sys.path.append(&quot;../modules&quot;)
 import ProfileGeneration
-</code></pre></div>
+
+#initialize profile generation class
+
+sigma = 5       #Images will be smoothed by a gaussian blur with sigma=5
+precision = 12  #Encoding will occur with a binary precision of 12
+#Polygons generated will have 24 Vertices with radial values between 20 and 80
+pg = ProfileGeneration.ProfileGeneration(nVertices=24,rMin=20,rMax=80,s=5,p=12)
+
+#generate a triangular polygon
+pg.triangleGenerator()
+#convert radial paramters into a smoothed image
+pg.arrayConversion()
+
+#plot the different realizations of the triangle
+fig = plt.figure(figsize=(10, 10))
+ax1 = plt.subplot(221,polar=True)
+ax2 = plt.subplot(222)
+ax3 = plt.subplot(223)
+ax4 = plt.subplot(224)
+ax1.set_rlim(0,90)
+ax2.set_xlim(0,180); ax2.set_xticks([])
+ax2.set_ylim(0,180); ax2.set_yticks([])
+ax3.set_xticks([]); ax4.set_xticks([])
+ax3.set_yticks([]); ax4.set_yticks([])
+ax1.set_title(&quot;Radial Parameterization&quot;, fontsize=18)
+ax2.set_title(&quot;Cartesian Coordinates&quot;, fontsize=18)
+ax3.set_title(&quot;Array Image&quot;, fontsize=18)
+ax4.set_title(&quot;Smoothed Image&quot;, fontsize=18)
+ax1.plot(pg.t, pg.r, c='tab:red', zorder= 1)
+ax1.scatter(pg.t, pg.r, c='tab:blue', s=10, zorder= 2)
+ax2.plot(pg.x, pg.y, c='tab:red', zorder= 1)
+ax2.scatter(pg.x, pg.y, c='tab:blue', s=10, zorder= 2)
+ax3.imshow(pg.arrayImage, cmap='binary')
+ax3.plot(pg.x, pg.y, c='tab:red', zorder= 1)
+ax3.scatter(pg.x, pg.y, c='tab:blue', s=10, zorder= 2)
+ax4.imshow(pg.smoothedImage, cmap='binary')
+ax4.plot(pg.x, pg.y, c='tab:red', zorder= 1)
+ax4.scatter(pg.x, pg.y, c='tab:blue', s=10, zorder= 2)
+plt.savefig(&quot;temp.png&quot;)
+plt.close()
+
+#verify that shape encoding/decoding is working properly
+#encode polygon to chromosome
+pg.encodePolygon()
+originalTri = pg.r
+encodedTri = pg.binaryPolygon
+#decode chromosome back to polygon
+pg.decodeChromosome(encodedTri)
+decodedTri = pg.decodedPolygon
+print(f&quot;Encoded Chromosome:     {encodedTri}&quot;)
+print(f&quot;Original Radial values: {originalTri}&quot;)
+print(f&quot;Decoded Radial values:  {decodedTri}&quot;)
+#check all of the triangle radii and and return false if any radii doesn't match
+print(f&quot;Encoding Successful?: {any(decodedTri == originalTri)}&quot;)
+</code></pre>
+<p><img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/triangleGeneration.png?raw=true" alt="drawing" width="450"/></p></div>
             </div>
         </div>
 

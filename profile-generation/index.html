@@ -263,7 +263,7 @@ self.r[v] = np.sqrt(x**2 + y**2)
     self.r = self.r + (self.r &gt;= self.rMax)*(self.rMax-self.r)
 </code></pre>
 <p>an alternative method for polygon generation is to build a fourier series with random weights such that <span class="arithmatex">\(R(0) = R(2\pi)\)</span> the structure of these shapes is highly dependent on the number of terms, if only one term is used the same circle will always be drawn and if too many terms are used (more than 5) the shape generated isn't quite useable</p>
-<p><img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/fourierPolygons?raw=true" alt="drawing" width="900"/></p>
+<p><img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/fourierPolygons.png?raw=true" alt="drawing" width="900"/></p>
 <h2 id="binary-representation">Binary Representation</h2>
 <p>in the genetic operations expect profiles to be in a binary representation, that conversion is handled in this module with encodePolygon() and the binary representation can be decoded back to the radial form with decodePolygon() </p>
 <pre><code class="language-Python">def encodePolygon(self):

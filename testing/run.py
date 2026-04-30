@@ -8,6 +8,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
+sys.path.append("../modules")
 import InverseDesign
 
 

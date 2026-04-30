@@ -11,10 +11,173 @@ This module primarily houses the ProfileGeneration() class which manages everyth
 
 In the context of the downstream genetic algorithm these geometry profiles describe different realization of parameter space. An example profile geometry is shown below:
 
-<img src="/images/polygonParamterizationDiagram.png" alt="drawing" width="300"/>
+<img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/polygonParamterizationDiagram.png?raw=true" alt="drawing" width="300"/>
 
 each red dot indicates an individual element of a profile in polar coordinates, represented as an ordered pair, $(\theta_n,r_n)$ where $r_n$ is the point along the line cast from the center to the edge of the domain that intersects with the polygon, this realization of the polygon is refered to as the "radial parameterization" later on
 
+
+## Profile Generators
+there are five profile generator functions implemented, with plans to extend merge rectangleGenerator() and triangleGenerator() into a generalized generator for n-sided polygons. 
+
+Generation of circles is by far the simplest process every radial term is set equal resulting in a uniform circle
+
+```Python
+def circleGenerator(self):
+    self.t = np.linspace(0,2*np.pi, self.nVertices)
+    self.fourierGenerator(1)
+    self.r = np.random.randint(self.rMin, self.rMax)*(self.r / np.max(self.r))
+```
+
+as detailed in the previous section radial parameterization of arbitrary polygons is accomplished by finding the point where a central ray intersects with polygon edges. For rectangles this process has a special simplified case seen in the below code segment.
+
+```Python
+def rectangleGenerator(self, spanMin = 40, spanMax = 135):
+    rectW = np.random.randint(spanMin, spanMax)
+    rectH = np.random.randint(spanMin, spanMax)
+    self.t = np.linspace(0,2*np.pi, self.nVertices)
+    self.r = np.zeros(self.nVertices)
+    #calculate rays cast far from the origin
+    x, y = 240*np.cos(self.t), 240*np.sin(self.t)
+    for v in range(self.nVertices):
+        if np.abs(y[v]/x[v]) > rectH/rectW:
+            #The far ray intersects with the top or bottom of the rectangle
+            self.r[v] = (rectH/2)/np.abs(np.sin(self.t[v]))
+        else:
+            #The far ray intersects with the side of the rectangle
+            self.r[v] = (rectW/2)/np.abs(np.cos(self.t[v]))
+```
+
+In the beginning of this section it was mentioned that a n-sided polygon generator is planned to replace rectangleGenerator() and triangleGenerator(), the blueprint of this would follow the triangleGenerator() code below, so it's a good idea to break down this code
+
+```Python
+  def triangleGenerator(self):
+    self.t = np.linspace(0,2*np.pi, self.nVertices)
+    self.r = np.zeros(self.nVertices)
+
+    #places three random vertices within the domain
+    v0 = np.random.randint(-70,70, 2); x1, y1 = v0
+    v1 = np.random.randint(-70,70, 2); x2, y2 = v1
+    v2 = np.random.randint(-70,70, 2); x3, y3 = v2
+    area = 0.5 * np.abs(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))
+    while area <= 4*np.pi*self.rMin*self.rMin:
+        v0 = np.random.randint(-70,70, 2); x1, y1 = v0
+        v1 = np.random.randint(-70,70, 2); x2, y2 = v1
+        v2 = np.random.randint(-70,70, 2); x3, y3 = v2
+        area = 0.5 * np.abs(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))
+    #find the center of the triangle
+    xC = np.mean([v0[0], v1[0], v2[0]]); yC = np.mean([v0[1], v1[1], v2[1]])
+    #shift each vertice so that the triangle is centered at the origin
+    vC0 = (v0[0]-xC, v0[1]-yC); vC1 = (v1[0]-xC, v1[1]-yC); vC2 = (v2[0]-xC, v2[1]-yC)
+    
+    for v in range(self.nVertices):
+        ray = LineString([(0,0), (180*np.cos(self.t[v]), 180*np.sin(self.t[v]))])
+        edge01 = LineString([(vC0[0], vC0[1]),(vC1[0], vC1[1])])
+        edge12 = LineString([(vC1[0], vC1[1]),(vC2[0], vC2[1])])
+        edge20 = LineString([(vC2[0], vC2[1]),(vC0[0], vC0[1])])
+
+        edge01Int = ray.intersection(edge01)
+        edge12Int = ray.intersection(edge12)
+        edge20Int = ray.intersection(edge20)
+
+        if np.shape(edge01Int.coords)[0] != 0:
+            x, y = edge01Int.coords[0][0], edge01Int.coords[0][1]
+        elif np.shape(edge12Int.coords)[0] != 0:
+            x, y = edge12Int.coords[0][0], edge12Int.coords[0][1]
+        elif np.shape(edge20Int.coords)[0] != 0:
+            x, y = edge20Int.coords[0][0], edge20Int.coords[0][1]
+        else:
+            x, y = 0, 0
+        
+        self.r[v] = np.sqrt(x**2 + y**2)
+
+```
+
+Three random vertices are chosen and the area of that triangle is calculated and if the area is below a set limit (four times the area of the minimum circle seems to produce results that are reasonable), then the vertices are re-selected until that condition is passed and then the vertices are shifted so the center of mass of the triangle is centered at the origin
+
+```Python
+v0 = np.random.randint(-70,70, 2); x1, y1 = v0
+v1 = np.random.randint(-70,70, 2); x2, y2 = v1
+v2 = np.random.randint(-70,70, 2); x3, y3 = v2
+
+area = 0.5 * np.abs(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))
+while area <= 4*np.pi*self.rMin*self.rMin:
+    v0 = np.random.randint(-70,70, 2); x1, y1 = v0
+    v1 = np.random.randint(-70,70, 2); x2, y2 = v1
+    v2 = np.random.randint(-70,70, 2); x3, y3 = v2
+    area = 0.5 * np.abs(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))
+
+xC = np.mean([v0[0], v1[0], v2[0]]); yC = np.mean([v0[1], v1[1], v2[1]])
+#shift each vertice so that the triangle is centered at the origin
+vC0 = (v0[0]-xC, v0[1]-yC); vC1 = (v1[0]-xC, v1[1]-yC); vC2 = (v2[0]-xC, v2[1]-yC)
+```
+for each polar angle associated with a radial parameter (generally refered to a vertex but that language is a bit confusing in this context) a line segment from 0 along the polar angle to the edge of the domain is generated. 
+
+```Python
+ray = LineString([(0,0), (180*np.cos(self.t[v]), 180*np.sin(self.t[v]))])
+```
+an the edeges of the desired triangle are drawn from it's vertices
+```Python
+edge01 = LineString([(vC0[0], vC0[1]),(vC1[0], vC1[1])])
+edge12 = LineString([(vC1[0], vC1[1]),(vC2[0], vC2[1])])
+edge20 = LineString([(vC2[0], vC2[1]),(vC0[0], vC0[1])])
+```
+
+using LineString() from the Shapely python library the each edge is checked for an intersection with the test line segment and the distance from the origin to that coordinate is saved as the radial value. 
+
+```Python
+edge01Int = ray.intersection(edge01)
+edge12Int = ray.intersection(edge12)
+edge20Int = ray.intersection(edge20)
+
+if np.shape(edge01Int.coords)[0] != 0:
+    x, y = edge01Int.coords[0][0], edge01Int.coords[0][1]
+elif np.shape(edge12Int.coords)[0] != 0:
+    x, y = edge12Int.coords[0][0], edge12Int.coords[0][1]
+elif np.shape(edge20Int.coords)[0] != 0:
+    x, y = edge20Int.coords[0][0], edge20Int.coords[0][1]
+else:
+    x, y = 0, 0
+
+self.r[v] = np.sqrt(x**2 + y**2)
+```
+
+This geometric analysis approach works very well and is reliable in generating an assortment of triangles, but the following generators take a less controlled approach
+
+```Python
+def polygonGenerator(self):
+    self.t = np.linspace(0,2*np.pi, self.nVertices)
+    self.r = np.random.randint(self.rMin, self.rMax, self.nVertices)
+    self.r = self.r*1.0
+    self.r[-1] = self.r[0]
+```
+
+in this method each radial value is assigned a random number in the allowed range, generating widely varied polygons, which is ideal for initializing a chromosome population where high diversity is diserable.
+
+
+```Python
+def fourierGenerator(self, nTerms):
+    self.r = np.zeros(self.nVertices)
+    self.t = np.linspace(0,2*np.pi, self.nVertices)
+    #setup random fourier series terms
+    c = np.random.rand(nTerms)
+    d = np.random.rand(nTerms)
+    #fourier series terms should sum to rMax for scaling purposes
+    c = self.rMax*(c / sum(c))
+    d = self.rMax*(d / sum(d))
+    for v in range(self.nVertices):
+        for n in range(nTerms):
+            self.r[v] += c[n]*np.sin(n*self.t[v])+d[n]*np.cos(n*self.t[v])
+
+    #restrict r to the range [rMin, rMax]
+    self.r = self.r + (self.r <= self.rMin)*(self.rMin-self.r)
+    self.r = self.r + (self.r >= self.rMax)*(self.rMax-self.r)
+```
+
+an alternative method for polygon generation is to build a fourier series with random weights such that $R(0) = R(2\pi)$ the structure of these shapes is highly dependent on the number of terms, if only one term is used the same circle will always be drawn and if too many terms are used (more than 5) the shape generated isn't quite useable
+
+<img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/fourierPolygons.png?raw=true" alt="drawing" width="900"/>
+
+In the above image the affect of increasing terms is demonstrated more than five terms will generally results in profiles that are quite short and increasingly wide along the right hand side.
 
 ## Binary Representation
 in the genetic operations expect profiles to be in a binary representation, that conversion is handled in this module with encodePolygon() and the binary representation can be decoded back to the radial form with decodePolygon() 
@@ -178,15 +341,77 @@ self.smoothedImage = np.round(self.smoothedImage / np.max(self.smoothedImage))
 
 this smoothing results in the polygon edges acting more like splines to guide the nanostructure profile shape but still act as a reliable parameterization of the nanostructure. 
 
-<img src="/images/polygonSmoothing.png" alt="drawing" width="900"/>
+<img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/polygonSmoothing.png?raw=true" alt="drawing" width="900"/>
 
 
+## Example Testing Code
 ```python
+#Example of using ProfileGeneration.py to generate a triangular polygon
+#/testing/generationTriangle.py
 import sys
+import matplotlib.pyplot as plt
 
 sys.path.append("../modules")
 import ProfileGeneration
+
+#initialize profile generation class
+
+sigma = 5       #Images will be smoothed by a gaussian blur with sigma=5
+precision = 12  #Encoding will occur with a binary precision of 12
+#Polygons generated will have 24 Vertices with radial values between 20 and 80
+pg = ProfileGeneration.ProfileGeneration(nVertices=24,rMin=20,rMax=80,s=5,p=12)
+
+#generate a triangular polygon
+pg.triangleGenerator()
+#convert radial paramters into a smoothed image
+pg.arrayConversion()
+
+#plot the different realizations of the triangle
+fig = plt.figure(figsize=(10, 10))
+ax1 = plt.subplot(221,polar=True)
+ax2 = plt.subplot(222)
+ax3 = plt.subplot(223)
+ax4 = plt.subplot(224)
+ax1.set_rlim(0,90)
+ax2.set_xlim(0,180); ax2.set_xticks([])
+ax2.set_ylim(0,180); ax2.set_yticks([])
+ax3.set_xticks([]); ax4.set_xticks([])
+ax3.set_yticks([]); ax4.set_yticks([])
+ax1.set_title("Radial Parameterization", fontsize=18)
+ax2.set_title("Cartesian Coordinates", fontsize=18)
+ax3.set_title("Array Image", fontsize=18)
+ax4.set_title("Smoothed Image", fontsize=18)
+ax1.plot(pg.t, pg.r, c='tab:red', zorder= 1)
+ax1.scatter(pg.t, pg.r, c='tab:blue', s=10, zorder= 2)
+ax2.plot(pg.x, pg.y, c='tab:red', zorder= 1)
+ax2.scatter(pg.x, pg.y, c='tab:blue', s=10, zorder= 2)
+ax3.imshow(pg.arrayImage, cmap='binary')
+ax3.plot(pg.x, pg.y, c='tab:red', zorder= 1)
+ax3.scatter(pg.x, pg.y, c='tab:blue', s=10, zorder= 2)
+ax4.imshow(pg.smoothedImage, cmap='binary')
+ax4.plot(pg.x, pg.y, c='tab:red', zorder= 1)
+ax4.scatter(pg.x, pg.y, c='tab:blue', s=10, zorder= 2)
+plt.savefig("temp.png")
+plt.close()
+
+#verify that shape encoding/decoding is working properly
+#encode polygon to chromosome
+pg.encodePolygon()
+originalTri = pg.r
+encodedTri = pg.binaryPolygon
+#decode chromosome back to polygon
+pg.decodeChromosome(encodedTri)
+decodedTri = pg.decodedPolygon
+print(f"Encoded Chromosome:     {encodedTri}")
+print(f"Original Radial values: {originalTri}")
+print(f"Decoded Radial values:  {decodedTri}")
+#check all of the triangle radii and and return false if any radii doesn't match
+print(f"Encoding Successful?: {any(decodedTri == originalTri)}")
 ```
+
+Which should produce an image similar to the following
+
+<img src="https://github.com/egnorris/NanostructureInverseDesignGA/blob/gh-pages/images/triangleGeneration.png?raw=true" alt="drawing" width="450"/>
 
 
 

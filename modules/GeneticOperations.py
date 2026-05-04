@@ -1,5 +1,6 @@
 import Support
 import numpy as np
+import unittest
 global defaultKwargs
 global keywords
 defaultKwargs = Support.defaultKwargs
@@ -108,6 +109,107 @@ class GeneticOperations():
     self.c0Mutated = ''.join(map(str,c0Mut))
     self.c1Mutated = ''.join(map(str,c1Mut))
 
+    self.c0 = self.c0Mutated
+    self.c1 = self.c1Mutated
+
   def operate(self):
     self.crossover()
     self.mutate()
+
+
+
+
+
+
+#unit Testing   
+class TestGeneticOperations(unittest.TestCase):
+
+  def testCrossover1(self):
+    """
+      One Point Crossover Validation Test 
+    """
+    p0 = '00001111'
+    p1 = '01010101'
+    go = GeneticOperations(p0, p1, mR=0.1, cP=1)
+    go.crossover()
+    cp = go.crossoverPoints
+    self.assertTrue(go.c0 == p0[:cp[0]] + p1[cp[0]:])
+    self.assertTrue(go.c1 == p1[:cp[0]] + p0[cp[0]:])
+
+  def testCrossover2(self):
+    """
+      Two Point Crossover Validation Test 
+    """
+    p0 = '00001111'
+    p1 = '01010101'
+    go = GeneticOperations(p0, p1, mR=0.1, cP=2)
+    go.crossover()
+    cp = go.crossoverPoints
+    self.assertTrue(go.c0 == p0[:cp[0]] + p1[cp[0]:cp[1]] + p0[cp[1]:])
+    self.assertTrue(go.c1 == p1[:cp[0]] + p0[cp[0]:cp[1]] + p1[cp[1]:])
+
+
+  def testCrossover3(self):
+    """
+      Three Point Crossover Validation Test 
+    """
+    p0 = '00001111'
+    p1 = '01010101'
+    go = GeneticOperations(p0, p1, mR=0.1, cP=3)
+    go.crossover()
+    cp = go.crossoverPoints
+    self.assertTrue(go.c0 == p0[:cp[0]] + p1[cp[0]:cp[1]] + p0[cp[1]:cp[2]] + p1[cp[2]:])
+    self.assertTrue(go.c1 == p1[:cp[0]] + p0[cp[0]:cp[1]] + p1[cp[1]:cp[2]] + p0[cp[2]:])
+
+
+  def testMutation(self):
+    """
+      Mutation Test: mutated children should not match after mutation
+    """
+    p0 = '0000011111'
+    p1 = '0101010101'
+    go = GeneticOperations(p0, p1, mR=0.1, cP=1)
+    go.crossover()
+    c0 = go.c0
+    c1 = go.c1
+    go.mutate()
+    self.assertFalse(c0 == go.c0)
+    self.assertFalse(c1 == go.c1)
+
+
+  def testCrossoverFormat(self):
+    """
+      Crossover Format Test: Crossover should result in children with the same length as the parents
+    """
+    for k in range(1,4):
+        p0 = '00001111'
+        p1 = '01010101'
+        go = GeneticOperations(p0, p1, mR=0.1, cP=k)
+        go.crossover()
+        cp = go.crossoverPoints
+        self.assertTrue(len(p0) == len(go.c0))
+        self.assertTrue(len(p0) == len(go.c1))
+
+
+  def testMutationaFormat(self):
+    """
+      Mutation Format Test: mutated children should retain their formatting
+    """
+    p0 = '00001111'
+    p1 = '01010101'
+    go = GeneticOperations(p0, p1, mR=0.1, cP=1)
+    go.crossover()
+    c0 = go.c0
+    c1 = go.c1
+    go.mutate()
+
+    self.assertTrue(len(c0) == len(go.c0))
+    self.assertTrue(len(c1) == len(go.c1))
+
+
+
+if __name__ == '__main__':
+    unittest.main()
+    
+
+    

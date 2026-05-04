@@ -4,6 +4,7 @@ from skimage.measure import grid_points_in_poly
 from skimage import filters
 from shapely.geometry import LineString
 import matplotlib.pyplot as plt
+import unittest
 
 global defaultKwargs
 global keywords
@@ -60,6 +61,55 @@ class ProfileGeneration():
                 #The far ray intersects with the side of the rectangle
                 self.r[v] = (rectW/2)/np.abs(np.cos(self.t[v]))
 
+    def triangleGenerator(self):
+        self.t = np.linspace(0,2*np.pi, self.nVertices)
+        self.r = np.zeros(self.nVertices)
+
+        #places three random vertices within the domain
+        v0 = np.random.randint(-70,70, 2)
+        v1 = np.random.randint(-70,70, 2)
+        v2 = np.random.randint(-70,70, 2)
+        x1, y1 = v0
+        x2, y2 = v1
+        x3, y3 = v2
+        area = 0.5 * np.abs(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))
+        while area <= 4*np.pi*self.rMin*self.rMin:
+            v0 = np.random.randint(-70,70, 2)
+            v1 = np.random.randint(-70,70, 2)
+            v2 = np.random.randint(-70,70, 2)
+            x1, y1 = v0
+            x2, y2 = v1
+            x3, y3 = v2
+            area = 0.5 * np.abs(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))
+        #find the center of the triangle
+        xC = np.mean([v0[0], v1[0], v2[0]])
+        yC = np.mean([v0[1], v1[1], v2[1]])
+        #shift each vertice so that the triangle is centered at the origin
+        vC0 = (v0[0]-xC, v0[1]-yC)
+        vC1 = (v1[0]-xC, v1[1]-yC)
+        vC2 = (v2[0]-xC, v2[1]-yC)
+        
+        for v in range(self.nVertices):
+            ray = LineString([(0,0), (180*np.cos(self.t[v]), 180*np.sin(self.t[v]))])
+            edge01 = LineString([(vC0[0], vC0[1]),(vC1[0], vC1[1])])
+            edge12 = LineString([(vC1[0], vC1[1]),(vC2[0], vC2[1])])
+            edge20 = LineString([(vC2[0], vC2[1]),(vC0[0], vC0[1])])
+
+            edge01Int = ray.intersection(edge01)
+            edge12Int = ray.intersection(edge12)
+            edge20Int = ray.intersection(edge20)
+
+            if np.shape(edge01Int.coords)[0] != 0:
+                x, y = edge01Int.coords[0][0], edge01Int.coords[0][1]
+            elif np.shape(edge12Int.coords)[0] != 0:
+                x, y = edge12Int.coords[0][0], edge12Int.coords[0][1]
+            elif np.shape(edge20Int.coords)[0] != 0:
+                x, y = edge20Int.coords[0][0], edge20Int.coords[0][1]
+            else:
+                x, y = 0, 0
+            
+            self.r[v] = np.sqrt(x**2 + y**2)
+
     def polygonGenerator(self):
         self.t = np.linspace(0,2*np.pi, self.nVertices)
         self.r = np.random.randint(self.rMin, self.rMax, self.nVertices)
@@ -85,7 +135,6 @@ class ProfileGeneration():
         for i in range(n):
             #generate a random allowed position
             r = np.random.randint(self.rMin, self.rMax)
-            print(t)
             x = r*np.cos(t[i]) + self.dom[0]/2
             y = r*np.sin(t[i]) + self.dom[1]/2
             v[i, :] = [x,y]
@@ -104,11 +153,12 @@ class ProfileGeneration():
     def __placeVertices(self, n):
         vertex = self.__generateVertices(n)
         edge, edgeLength = self.__getEdges(n, vertex)
-        while (np.sum(edgeLength) < 4*np.pi*self.rMin) or any(edgeLength > 3*np.min(edgeLength)):
+        while (np.sum(edgeLength) < 5*np.pi*self.rMin) or any(edgeLength > 10*np.min(edgeLength)):
             vertex = self.__generateVertices(n)
-            vertex = self.__originCentering(vertex)
             edge, edgeLength = self.__getEdges(n, vertex)
         
+        vertex = self.__originCentering(vertex)
+        edge, edgeLength = self.__getEdges(n, vertex)
         return vertex, edge, edgeLength
 
     def ___getIntersection(self, edge, angle):
@@ -121,6 +171,7 @@ class ProfileGeneration():
             temp = rayString.intersection(edgeString)
             if np.shape(temp.coords)[0] != 0:
                 return temp.coords[0]
+        return [0, 0]
             
 
     def ngonGenerator(self, n):
@@ -225,5 +276,101 @@ class ProfileGeneration():
         self.r = self.decodedPolygon
         self.arrayConversion()
 
+
+#unit Testing   
+class TestProfileGeneration(unittest.TestCase):
+    def testTriangleParamerization(self):
+        """
+            Test Triangle Paramterization: After generating a triangle the number of radial coordinates should match nVertices
+        """
+        for n in range(16, 49):
+            pg = ProfileGeneration(nVertices=n,rMin=20,rMax=80,s=5,p=12)
+            pg.triangleGenerator()
+            self.assertEqual(len(pg.r), n)
+            self.assertEqual(len(pg.t), n)
+
+    def testTriangleCentering(self):
+        """
+            Test Triangle Centering: The center of a generated triangle should be near the center of the domain
+        """
+        pg = ProfileGeneration(nVertices=24,rMin=20,rMax=80,s=5,p=12)
+        pg.triangleGenerator()
+        pg.arrayConversion()
+        self.assertTrue((np.mean(pg.x) > 0.95*pg.dom[0]/2))
+        self.assertTrue((np.mean(pg.x) < 1.05*pg.dom[0]/2))
+        self.assertTrue((np.mean(pg.y) > 0.95*pg.dom[1]/2))
+        self.assertTrue((np.mean(pg.y) < 1.05*pg.dom[1]/2))
+
+    def testRectangleParamerization(self):
+        """
+            Test Rectangle Paramterization: After generating a rectangle the number of radial coordinates should match nVertices
+        """
+        for n in range(16, 49):
+            pg = ProfileGeneration(nVertices=n,rMin=20,rMax=80,s=5,p=12)
+            pg.rectangleGenerator()
+            self.assertEqual(len(pg.r), n)
+            self.assertEqual(len(pg.t), n)
+
+    def testRectangleCentering(self):
+        """
+            Test Rectangle Centering: The center of a generated rectangle should be near the center of the domain
+        """
+        pg = ProfileGeneration(nVertices=24,rMin=20,rMax=80,s=5,p=12)
+        pg.rectangleGenerator()
+        pg.arrayConversion()
+        self.assertTrue((np.mean(pg.x) > 0.95*pg.dom[0]/2))
+        self.assertTrue((np.mean(pg.x) < 1.05*pg.dom[0]/2))
+        self.assertTrue((np.mean(pg.y) > 0.95*pg.dom[1]/2))
+        self.assertTrue((np.mean(pg.y) < 1.05*pg.dom[1]/2))
+
+
+    def testNgonParamerization(self):
+        """
+            Test N-gon Paramterization: After generating an n-sided polygon the number of radial coordinates should match nVertices
+        """
+        for n in range(16, 49):
+            for k in range(3, 10):
+                pg = ProfileGeneration(nVertices=n,rMin=20,rMax=80,s=5,p=12)
+                pg.ngonGenerator(n=k)
+                self.assertEqual(len(pg.r), n)
+                self.assertEqual(len(pg.t), n)
+
+    def testNgonCentering(self):
+        """
+            Test N-gon Centering: The center of a generated n-sided polygon should be near the center of the domain
+        """
+        pg = ProfileGeneration(nVertices=24,rMin=20,rMax=80,s=5,p=12)
+        for k in range(2, 10):
+            pg.ngonGenerator(n=k)
+            pg.arrayConversion()
+            self.assertTrue((np.mean(pg.x) > 0.95*pg.dom[0]/2))
+            self.assertTrue((np.mean(pg.x) < 1.05*pg.dom[0]/2))
+            self.assertTrue((np.mean(pg.y) > 0.95*pg.dom[1]/2))
+        self.assertTrue((np.mean(pg.y) < 1.05*pg.dom[1]/2))
+
+
+
+    def testEncodingDecoding(self):
+        """
+            Testing Encoding and Decoding: decoding a profile that has been encoded should match the original profile
+        """
+        pg = ProfileGeneration(nVertices=24,rMin=20,rMax=80,s=5,p=12)
+        pg.ngonGenerator(n=10)
+        pg.arrayConversion()
+        pg.encodePolygon()
+        originalPoly = pg.r
+        encodedPoly = pg.binaryPolygon
+        pg.decodeChromosome(encodedPoly)
+        decodedPoly = pg.decodedPolygon
+
+        self.assertTrue(all(decodedPoly == originalPoly))
+        
+
+
+
+
+
+if __name__ == '__main__':
+    unittest.main()
 
     

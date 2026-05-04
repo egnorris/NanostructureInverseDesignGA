@@ -7,10 +7,15 @@ defaultKwargs = {
   "s": 5,
   "p": 12,
   "mR":0.1,
-  "cP":2,
+  "cP":1,
   "l":[1,2,2],
   "m":[1,1,2],
-  "f":["E", "H"]}
+  "f":["E", "H"],
+  "minWavelength": 300,
+  "maxWavelength": 800,
+  "saeWeight": 1,
+  "sseWeight": 1
+  }
 
 keywords = {
     "rMin":["rMin", "minR", "r0", "minimumR", "rMinimum", "minimumRadius"],
@@ -23,6 +28,10 @@ keywords = {
     "l": ["l", "degree"],
     "m": ["m", "order"],
     "f": ["f", "fields"],
+    "minWavelength": ["wMin", "minW", "w0", "minimumW", "wMinimum", "minimumWavelength"],
+    "maxWavelength": ["wMax", "maxW", "w1", "maximimW", "wMaximum", "maximumWavelength"],
+    "saeWeight": ["saeWeight", "weightSae", "maeWeight", "weightMae", "fMae", "maeF", "fSae", "saeF"],
+    "sseWeight": ["sseWeight", "weightSse", "mseWeight", "weightMse", "fMse", "mseF", "fSse", "sseF"]
     }
 
 def getkwarg(kwargs, default, keywords):
@@ -41,3 +50,9 @@ def closestRadius(r, rMin, rMax, p):
   idx = np.argmin(np.abs(radiusRange - r))
   rMatch = radiusRange[idx]
   return rMatch
+
+def binaryArray2Str(binaryArray):
+  bStr = ''
+  for i in range(len(binaryArray)):
+    bStr = bStr + f'{binaryArray[i]}'
+  return bStr

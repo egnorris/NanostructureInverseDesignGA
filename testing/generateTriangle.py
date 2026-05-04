@@ -13,7 +13,7 @@ precision = 12  #Encoding will occur with a binary precision of 12
 pg = ProfileGeneration.ProfileGeneration(nVertices=24,rMin=20,rMax=80,s=5,p=12)
 
 #generate a triangular polygon
-pg.triangleGenerator()
+pg.ngonGenerator(n=3)
 #convert radial paramters into a smoothed image
 pg.arrayConversion()
 

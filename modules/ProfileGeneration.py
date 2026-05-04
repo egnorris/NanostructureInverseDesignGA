@@ -366,6 +366,15 @@ class TestProfileGeneration(unittest.TestCase):
         self.assertTrue(all(decodedPoly == originalPoly))
         
 
+    def testPrecisionMatching(self):
+        """
+            Test Encode/Decode Precision Matching: any encoded radius should match defined binary precision
+        """
+
+        pg = ProfileGeneration(nVertices=1,rMin=20,rMax=80,s=5,p=6)
+        r = pg._ProfileGeneration__decodeRadius('1')
+        b = pg._ProfileGeneration__encodeRadius(r)
+        self.assertTrue('000001' == b)
 
 
 

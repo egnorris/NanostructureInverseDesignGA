@@ -38,7 +38,6 @@ class Population():
         self.lambdaMax = Support.getkwarg(kwargs, defaultKwargs["maxWavelength"], keywords["maxWavelength"])
         self.saeWeight = Support.getkwarg(kwargs, defaultKwargs["saeWeight"], keywords["saeWeight"])
         self.sseWeight = Support.getkwarg(kwargs, defaultKwargs["sseWeight"], keywords["sseWeight"])
-
         self.profGen = pg.ProfileGeneration(self.nVertices,rMin=self.rMin,rMax=self.rMax,d=self.dom,s=self.s,p=self.p)
         self.dlModels = dl.DeepLearning(self.trainedModelPath,l=self.l,m=self.m,f=self.f)
         self.dlModels.loadModels()
@@ -47,6 +46,31 @@ class Population():
         self.objScatteredPower = np.loadtxt(spectrumFileName)
         self.tss = np.var(self.objScatteredPower) * len(self.objScatteredPower)
     
+    def __updateNewPopulation(self, n, sn):
+        self.update_chromosomes[n]     = self.profGen.binaryPolygon
+        self.update_polar[n, :, 0]     = self.profGen.r
+        self.update_polar[n, :, 1]     = self.profGen.t
+        self.update_cartesian[n, :, 0] = self.profGen.x
+        self.update_cartesian[n, :, 1] = self.profGen.y
+        self.update_images[n,:,:]      = self.profGen.smoothedImage
+        self.update_serialNumber[n]    = sn
+
+    def writePopuliaton(self):
+        populationData = {
+            'r': self.polar[:, :, 0],
+            't': self.polar[:, :, 1],
+            'x': self.cartesian[:, :, 0],
+            'y': self.cartesian[:, :, 1],
+            "i": self.images,
+            "s": self.serialNumber,
+            "f": self.fitness,
+            "p": self.scatteredPower,
+            "m": self.multipoles
+        }
+        return populationData
+
+
+
     def __updateInitialPopulation(self, n):
             self.profGen.arrayConversion()
             self.profGen.encodePolygon()
@@ -64,7 +88,6 @@ class Population():
         return 1 / (1+np.exp(-x))
     
     def __fit(self, x, t=0, s=0.25):
-
         a = np.exp(np.log(s)/(-t+1))
         b = -np.log(s)/(-t+1)
         if x <= t:
@@ -170,7 +193,6 @@ class Population():
         j = 0
         for k in range(len(p)):
             temp += p[k]
-            
             if temp > x:
                 j = i[k]
                 f = np.delete(f, k)
@@ -198,19 +220,7 @@ class Population():
             j0, f, i = self.roulette(f, i)
             self.retainedPopulation[k] = j0
 
-    def __updateNewPopulation(self, n):
-            self.update_chromosomes[n]     = self.profGen.binaryPolygon
-            self.update_polar[n, :, 0]     = self.profGen.r
-            self.update_polar[n, :, 1]     = self.profGen.t
-            self.update_cartesian[n, :, 0] = self.profGen.x
-            self.update_cartesian[n, :, 1] = self.profGen.y
-            self.update_images[n,:,:]      = self.profGen.smoothedImage
-            self.update_serialNumber[n]    = self.ProfilesGenerated
-            self.ProfilesGenerated  += 1
-            return n + 1
-
     def update(self, birthRate = 1.0):
-
         #####################################################################################################
             #Initialize Next Generation Population Arrays
         #####################################################################################################
@@ -242,9 +252,13 @@ class Population():
             g = go.GeneticOperations(p0, p1, mR=self.mR, cP=self.cP)
             g.operate()
             self.profGen.decodeChromosome(g.c0)
-            n = self.__updateNewPopulation(n)
+            self.__updateNewPopulation(n, self.ProfilesGenerated)
+            self.ProfilesGenerated += 1
+            n += 1
             self.profGen.decodeChromosome(g.c1)
-            n = self.__updateNewPopulation(n)
+            self.__updateNewPopulation(n, self.ProfilesGenerated)
+            self.ProfilesGenerated += 1
+            n += 1
         #####################################################################################################
             #select members of previous population to retain
         #####################################################################################################
@@ -254,10 +268,8 @@ class Population():
             p = self.chromosomes[self.retainedPopulation[k]]
             #this step isn't necessary in general but allows the updatenewPopulation() function to be used
             self.profGen.decodeChromosome(p)
-            n = self.__updateNewPopulation(n)
-            #this isn't a new profile so remove it from the count and set the proper serial number
-            self.ProfilesGenerated -= 1
-            self.update_serialNumber[n-1] = self.serialNumber[k]
+            self.__updateNewPopulation(n, self.serialNumber[k])
+            n += 1
         #####################################################################################################
             #check if the previous top performer is included in the update
         #####################################################################################################

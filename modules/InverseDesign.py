@@ -55,22 +55,6 @@ class Population():
         self.update_images[n,:,:]      = self.profGen.smoothedImage
         self.update_serialNumber[n]    = sn
 
-    def writePopuliaton(self):
-        populationData = {
-            'r': self.polar[:, :, 0],
-            't': self.polar[:, :, 1],
-            'x': self.cartesian[:, :, 0],
-            'y': self.cartesian[:, :, 1],
-            "i": self.images,
-            "s": self.serialNumber,
-            "f": self.fitness,
-            "p": self.scatteredPower,
-            "m": self.multipoles
-        }
-        return populationData
-
-
-
     def __updateInitialPopulation(self, n):
             self.profGen.arrayConversion()
             self.profGen.encodePolygon()

@@ -43,12 +43,13 @@ def getShannonEntropy(stateList):
                 binary string i.e. '000'
         Output:
             H: shannon entropy
-            normH: normalized shannon entropy, normalized by the maximum shannon entropy of N/2  
+            normH: normalized shannon entropy, normalized by the maximum shannon entropy of nBits/2  
     """
     stateArray = stateList2Array(stateList)
+    nBits = np.shape(stateArray)[1]
     bitProbabilities = getBitProbabilities(stateArray)
-    #shannon entropy is calculated with a base 2 logarithm and np.log() is the natural logarithm
-    log2p = (np.log(bitProbabilities)/np.log(2))
-    H = -np.nansum(bitProbabilities*log2p)
-    normH = 2*H/len(stateList)
+    H = -np.nansum(np.dot(bitProbabilities,np.log(bitProbabilities)))
+    normH = 2*H/nBits
     return np.round(H, 3), np.round(normH, 3)
+
+

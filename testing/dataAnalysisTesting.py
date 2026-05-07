@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 
 sys.path.append("../modules")
@@ -34,9 +35,10 @@ nSeeds = 200
 nGenerations = 50
 
 w = np.linspace(300,800,101)
+checkpoint = 2
 populationDict = {
     "birthRates": ((np.arange(nBirthRates)+1)/nBirthRates),
-    "seeds": np.arange(nSeeds),
+    "seeds": np.arange(nSeeds, step=checkpoint),
     "wavelengths": np.linspace(300,800,101),
     "evaluationWavelengths": [minWavelength, maxWavelength],
     "nVertices": nVertices,
@@ -44,13 +46,30 @@ populationDict = {
     "sigma": sigma,
     "domain": domain
     }
+print(populationDict["seeds"])
 
+
+try:
+    os.mkdir(f"{outDir}")
+except FileExistsError:
+    print(f"Directory: {outDir} Exists")
+
+try:
+    os.mkdir(f"checkpoint")
+except FileExistsError:
+    print(f"Directory: checkpoint Exists")
 
 EntropyStudy = np.zeros((nBirthRates, nSeeds, nGenerations+1))
+for seed in range(nSeeds):
 
-for birthRate in range(nBirthRates):
-    bR = (birthRate + 1)/nBirthRates
-    for seed in range(nSeeds):
+    """
+        Work in Progress
+        Still devising a checkpoint system where data collected previously is read from file, 
+        loaded into memory, and the data collection phase is skipped
+    """
+    for birthRate in range(nBirthRates):
+        bR = (birthRate + 1)/nBirthRates
+    
         np.random.seed(seed)
         #####################################################################################################
             #Initialize Population Class
@@ -101,9 +120,9 @@ for birthRate in range(nBirthRates):
         print(f"Average Fitness:        {np.round(np.mean(pop.fitness),3)}")
         print(f"Fitness Variance:       {np.round(np.var(pop.fitness),3)}")
         
-        if (seed % 25) == 0:
+        if (seed % checkpoint) == 0:
             da.plot6(f"Seed {seed} - Birth Rate {bR} - Generation {0} Top Performers", outDir,pop)
-        populationDict[f'dat-BirthRate-{bR}-Seed-{seed}-Generation{0}'] = da.packageDictionary(pop)
+            populationDict[f'dat-BirthRate-{bR}-Seed-{seed}-Generation{0}'] = da.packageDictionary(pop)
         
 
         for n in range(nGenerations):
@@ -124,13 +143,23 @@ for birthRate in range(nBirthRates):
             print(f"Maximum Fitness:        {np.round(np.max(pop.fitness),3)}")
             print(f"Average Fitness:        {np.round(np.mean(pop.fitness),3)}")
             print(f"Fitness Variance:       {np.round(np.var(pop.fitness),3)}")
-            if (seed % 25) == 0:
-                if (n % 5) == 0:
+            if (seed % checkpoint) == 0:
+                if ((n+1) % 5) == 0:
                     da.plot6(f"Seed {seed} - Birth Rate {bR} - Generation {n+1} Top Performers", outDir,pop)
-            populationDict[f'dat-BirthRate-{bR}-Seed-{seed}-Generation{n+1}'] = da.packageDictionary(pop)
+                    populationDict[f'dat-BirthRate-{bR}-Seed-{seed}-Generation{n+1}'] = da.packageDictionary(pop)
+
+    if (seed % checkpoint) == 0:
+        """
+            Work in Progress
+            save data during checkpoint in case of interruption the saved data
+            will be loaded to prevent repeated work 
+        """
+        
+        savemat(f"checkpoint/PopulationData-seed{seed}-checkpoint{seed}.mat", populationDict)
+        savemat(f"checkpoint/entropyData.checkpoint{seed}.mat", {"EntropyStudy": EntropyStudy})
 
 savemat("output/PopulationData.mat", populationDict)
-
+savemat(f"entropyData.mat", {"EntropyStudy": EntropyStudy})
 
 for birthRate in range(nBirthRates):
     bR = (birthRate + 1)/nBirthRates

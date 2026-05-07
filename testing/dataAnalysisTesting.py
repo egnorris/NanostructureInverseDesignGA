@@ -21,6 +21,7 @@ bPrecision = 12
 saeWeight = 1
 sseWeight = 1
 spectrumFileName = "input/objScatteredPower0.txt"
+outDir = '.'
 
 
 nBirthRates = 5
@@ -82,6 +83,8 @@ for birthRate in range(nBirthRates):
         print(f"Maximum Fitness:        {np.round(np.max(pop.fitness),3)}")
         print(f"Average Fitness:        {np.round(np.mean(pop.fitness),3)}")
         print(f"Fitness Variance:       {np.round(np.var(pop.fitness),3)}")
+        
+        da.plot6("Generation 0 Top Performers", outDir,pop)
 
         for n in range(nGenerations):
             #####################################################################################################

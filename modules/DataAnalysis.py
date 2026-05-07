@@ -108,6 +108,7 @@ def plot6(fname, outDir, population, idxList=[0,1,2,3,4,5]):
     fig.suptitle(fname)
     plt.tight_layout()
     plt.savefig(f'{outDir}/{fname.replace(" ", "-")}.png',dpi=300)
+    plt.close()
 
 
 

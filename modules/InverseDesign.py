@@ -159,7 +159,7 @@ class Population():
             n = self.__updateInitialPopulation(n)
         for k in range(nN):
             #generate n-sided polygons
-            self.profGen.ngonGenerator(n=np.random.randint(3,10))
+            self.profGen.ngonGenerator(n=np.random.randint(4,16))
             n = self.__updateInitialPopulation(n)
         #####################################################################################################
             #Evaluate Initial Population Profiles
@@ -210,6 +210,7 @@ class Population():
         #####################################################################################################
         nProfiles = self.nProfiles
         self.update_chromosomes         = np.zeros(nProfiles)
+        self.update_chromosomes         = list(self.update_chromosomes)
         self.update_polar               = np.zeros((nProfiles, self.nVertices, 2))
         self.update_cartesian           = np.zeros((nProfiles, self.nVertices+1, 2))
         self.update_images              = np.zeros((nProfiles, self.dom[0], self.dom[1]))

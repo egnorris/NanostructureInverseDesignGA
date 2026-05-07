@@ -2,3 +2,4 @@ venv/
 modules/__pycache__
 modules/__pycache__
 site/
+testing/output

@@ -4,3 +4,5 @@ modules/__pycache__
 site/
 testing/output
 testing/checkpoint
+testing/tensorflow.log
+testing/__pycache__/runInverseDesign.cpython-38.pyc

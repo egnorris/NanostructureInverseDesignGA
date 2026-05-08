@@ -14,7 +14,16 @@ defaultKwargs = {
   "minWavelength": 300,
   "maxWavelength": 800,
   "saeWeight": 1,
-  "sseWeight": 1
+  "sseWeight": 1,
+  "nT": 10,
+  "nC": 10,
+  "nR": 10,
+  "nP": 10,
+  "nN": 10,
+  "nV": 24,
+  "modelDir":"/media/work/evan/deep_learning_data/trained_models",
+  "targetFile": "input/objScatteredPower0.txt"
+
   }
 
 keywords = {
@@ -31,14 +40,27 @@ keywords = {
     "minWavelength": ["wMin", "minW", "w0", "minimumW", "wMinimum", "minimumWavelength"],
     "maxWavelength": ["wMax", "maxW", "w1", "maximimW", "wMaximum", "maximumWavelength"],
     "saeWeight": ["saeWeight", "weightSae", "maeWeight", "weightMae", "fMae", "maeF", "fSae", "saeF"],
-    "sseWeight": ["sseWeight", "weightSse", "mseWeight", "weightMse", "fMse", "mseF", "fSse", "sseF"]
+    "sseWeight": ["sseWeight", "weightSse", "mseWeight", "weightMse", "fMse", "mseF", "fSse", "sseF"],
+    "nT": ["nT", "nTriangles", "numTriangles"],
+    "nR": ["nR", "nRectangles", "numRectangles"],
+    "nC": ["nC", "nCircles", "numCircles"],
+    "nP": ["nP", "nPolygons", "numPolygons"],
+    "nN": ["nN", "nNgons", "numNgons"],
+    "nV": ["nV", 'nVertices'],
+    "modelDir": ["modelDir"],
+    "targetFile":["targetFile"]
+
     }
 
 def getkwarg(kwargs, default, keywords):
   for i in range(len(keywords)):
     if f"{keywords[i]}" in kwargs:
       #print(f"{keywords[0]}: {kwargs[keywords[i]]}")
-      return kwargs[keywords[i]]
+      kwargs[keywords[i]]
+      if kwargs[keywords[i]] != None:
+        return kwargs[keywords[i]]
+      else:
+        return default
   #print(f"Default {keywords[0]}: {default}")
   return default
 

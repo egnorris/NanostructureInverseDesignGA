@@ -41,8 +41,8 @@ def evolutionRun(s, br, PopulationDict, EntropyStudy, parsedArgs):
 
 parser = argparse.ArgumentParser(description="Run Genetic Algorithm Inverse Design")
 parser.add_argument('-outDir', type=str, required=False, default='.')
-parser.add_argument('-numGenerations', type=int, required=False, default=10)
-parser.add_argument('-numSeed', type=int, required=False, default=10)
+parser.add_argument('-numGenerations', type=int, required=False, default=30)
+parser.add_argument('-numSeed', type=int, required=False, default=50)
 parser.add_argument('-numBirthRate', type=int, required=False, default=5)
 parser.add_argument('-genSave', type=int, required=False, default=5)
 parser.add_argument('-seedCheckpoint', type=int, required=False, default=10)
@@ -97,18 +97,24 @@ populationDict = {
 print(populationDict.keys())
 entropyStudy = np.zeros((nBirthRates, nSeeds, nGenerations+1))
 
-a = loadmat(f"{outDir}/checkpoint/entropyData.checkpoint.mat")
 
-print()
+
+try:
+    a = loadmat(f"{outDir}/checkpoint/entropyData.checkpoint.mat")
+    resume=a["checkpoint"][0][0]
+except FileNotFoundError:
+    print("No checkpoint data present!")
+    resume = -1
+
 for s in range(nSeeds):
-    
-    if s < a["checkpoint"][0][0]:
+    if s < resume:
         """
         """
-    elif s == a["checkpoint"][0][0]:
-        print(f'Resuming from checkpoint: {a["checkpoint"][0][0]}')
-        entropyStudy = a["dat"]
+    elif (s == resume) and (resume >= 0):
+        print(f'Resuming from checkpoint: {resume}')
+        a = loadmat(f"{outDir}/checkpoint/entropyData.checkpoint.mat")
         b = loadmat(f"{outDir}/checkpoint/populationData.checkpoint.mat")
+        entropyStudy = a["dat"]
         populationDict.update(b)
         
     else:

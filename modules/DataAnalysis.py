@@ -115,13 +115,10 @@ def plot6(fname, outDir, population, idxList=[0,1,2,3,4,5]):
 def packageDictionary(population):
     #limit file size by only including data that can't be easily reconstructed
     temp = {
-        "Fitness": population.fitness,
-        "Residual": population.residual,
-        "tss": population.tss,
-        "Binary Chromosomes": population.chromosomes,
-        "Polar Coordinates": population.polar,
-        "scattered Power": population.scatteredPower,
-        "objective": population.objScatteredPower,
+        "fitness": population.fitness,
+        "scatteredPower": population.scatteredPower,
+        "cartesian": population.polar,
+        "sigma": population.s,
         "serialNumber": population.serialNumber,
         }
     return temp

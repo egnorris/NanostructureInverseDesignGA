@@ -1,93 +1,142 @@
+import sys
 import argparse
+import os
+import numpy as np
+from scipy.io import savemat, loadmat
+import matplotlib.pyplot as plt
+
+sys.path.append("../modules")
+
+import Support
+import runInverseDesign as run
+import DataAnalysis
+    
+def evolutionRun(s, br, PopulationDict, EntropyStudy, parsedArgs):
+    checkpoint = parsedArgs['seedCheckpoint']
+    #reset random number generator
+    np.random.seed(s)
+    outDir =  parsedArgs['outDir']
+    nGenerations = parsedArgs['numGenerations']
+    birthRate= (br + 1)/parsedArgs['numBirthRate']
+    print(f"    Birth Rate: {birthRate}")
+    genSave = parsedArgs['genSave']
+    pop = run.setupPopulation(**parsedArgs)
+    H, normH = DataAnalysis.getShannonEntropy(pop.chromosomes)
+    EntropyStudy[br, s, 0] = normH
+
+    if (s % checkpoint) == 0:
+        DataAnalysis.plot6(f"Seed {s} - Birth Rate {birthRate} - Generation {0} Top Performers", outDir,pop)
+    populationDict[f'dat-BirthRate-{birthRate}-Seed-{s}-Generation{0}'] = DataAnalysis.packageDictionary(pop)
+    
+    for n in range(nGenerations):
+        pop = run.updatePopulation(pop, birthRate=birthRate)
+        H, normH = DataAnalysis.getShannonEntropy(pop.chromosomes)
+        if ((n+1) % genSave) == 0:
+            if (s % checkpoint) == 0:
+                DataAnalysis.plot6(f"Seed {s} - Birth Rate {birthRate} - Generation {n+1} Top Performers",outDir,pop)
+        populationDict[f'dat-BirthRate-{birthRate}-Seed-{s}-Generation{n+1}'] = DataAnalysis.packageDictionary(pop)
+        EntropyStudy[br, s, n+1] = normH
+    return PopulationDict, EntropyStudy
+
 
 parser = argparse.ArgumentParser(description="Run Genetic Algorithm Inverse Design")
-#Required Parameters
-parser.add_argument('-out', '--outputDir', type = str, required=True,
-    help="Set directory to save output data to.")
+parser.add_argument('-outDir', type=str, required=False, default='.')
+parser.add_argument('-numGenerations', type=int, required=False, default=10)
+parser.add_argument('-numSeed', type=int, required=False, default=10)
+parser.add_argument('-numBirthRate', type=int, required=False, default=5)
+parser.add_argument('-genSave', type=int, required=False, default=5)
+parser.add_argument('-seedCheckpoint', type=int, required=False, default=10)
 
-parser.add_argument('-tp', '--targetPath', type=str, default=None,
-    help="Enter the path of the target scattered power spectrum; supercedes --targetGeneration argument if valid")
+parser.add_argument('-nV', type=int, required=False)
+parser.add_argument('-modelDir', type=str, required=False)
+parser.add_argument('-targetFile', type=str, required=False)
+parser.add_argument('-rMin', type=int, required=False)
+parser.add_argument('-rMax', type=int, required=False)
+parser.add_argument('-d', type=type(()), required=False)
+parser.add_argument('-s', type=int, required=False)
+parser.add_argument('-p', type=int, required=False)
+parser.add_argument('-mR', type=float, required=False)
+parser.add_argument('-cP', type=int, required=False)
+parser.add_argument('-l', type=type([]), required=False)
+parser.add_argument('-m', type=type([]), required=False)
+parser.add_argument('-f', type=type([]), required=False)
+parser.add_argument('-w0', type=int, required=False)
+parser.add_argument('-w1', type=int, required=False)
+parser.add_argument('-saeF', type=int, required=False)
+parser.add_argument('-sseF', type=int, required=False)
+parser.add_argument('-nT', type=int, required=False)
+parser.add_argument('-nC', type=int, required=False)
+parser.add_argument('-nR', type=int, required=False)
+parser.add_argument('-nP', type=int, required=False)
+parser.add_argument('-nN', type=int, required=False)
+parsedArgs = parser.parse_args().__dict__
 
-#Parameters with a default value
-parser.add_argument('-ng', '--numGenerations', type = int, required=False, default=25,
-    help="Define the number of generations to run the algorithm for; \nDefault: 25")
-parser.add_argument('-ns', '--numSave', type=int, required=False, default = 6,
-    help="Define the number of top performers to be saved from each generation to a .MAT binary; \n Default: 6")
+outDir = parsedArgs['outDir']
 
+try:
+    os.mkdir(f"{outDir}")
+except FileExistsError:
+    print(f"Directory: {outDir} Exists")
 
-parser.add_argument('-mD', '--modelDirectory', type=str, required=False, default = "/media/work/evan/deep_learning_data/trained_models",
-    help="")
+try:
+    os.mkdir(f"{outDir}/checkpoint")
+except FileExistsError:
+    print(f"Directory: {outDir}/checkpoint Exists")
 
-parser.add_argument('-nV', type=int, required=False, default = 24,
-    help="")
+nBirthRates = parsedArgs['numBirthRate']
+nSeeds = parsedArgs['numSeed']
+nGenerations = parsedArgs['numGenerations']
+checkpoint = parsedArgs['seedCheckpoint']
+global populationDict
+global EntropyStudy
 
-parser.add_argument('-nT', type=int, required=False, default = 30,
-    help="")
+populationDict = {
+    "birthRates": ((np.arange(nBirthRates)+1)/nBirthRates),
+    "seeds": np.arange(nSeeds, step=checkpoint),
+    }
+print(populationDict.keys())
+entropyStudy = np.zeros((nBirthRates, nSeeds, nGenerations+1))
 
-parser.add_argument('-nR', type=int, required=False, default = 30,
-    help="")
+a = loadmat(f"{outDir}/checkpoint/entropyData.checkpoint.mat")
 
-parser.add_argument('-nC', type=int, required=False, default = 30,
-    help="")
+print()
+for s in range(nSeeds):
+    
+    if s < a["checkpoint"][0][0]:
+        """
+        """
+    elif s == a["checkpoint"][0][0]:
+        print(f'Resuming from checkpoint: {a["checkpoint"][0][0]}')
+        entropyStudy = a["dat"]
+        b = loadmat(f"{outDir}/checkpoint/populationData.checkpoint.mat")
+        populationDict.update(b)
+        
+    else:
+        print(f"Seed: {s}")
+        for br in range(nBirthRates):
+                P, entropyStudy = evolutionRun(s, br, populationDict, entropyStudy, parsedArgs)
+                populationDict.update(P)
+                
 
-parser.add_argument('-nP', type=int, required=False, default = 30,
-    help="")
-
-parser.add_argument('-nF', type=int, required=False, default = 30,
-    help="")
-
-parser.add_argument('-r0', '--rMin', type=int, required=False, default = 10,
-    help="")
-
-parser.add_argument('-r1', '--rMax', type=int, required=False, default = 75,
-    help="")
-
-parser.add_argument('--smoothness', type=int, required=False, default = 5,
-    help="")
-
-parser.add_argument('-p','--precision', type=int, required=False, default = 12,
-    help="")
-
-parser.add_argument('-mR', '--mutationRate', type=float, required=False, default = 0.1,
-    help="")
-
-parser.add_argument('-cP', '--numCrossoverPoints', type=int, required=False, default = 1,
-    help="")
-
-parser.add_argument('-l' , required=False, default = [1,2,2],
-    help="")
-
-parser.add_argument('-m' , required=False, default = [1,1,2],
-    help="")
-
-parser.add_argument('-f' , required=False, default = ['E','H'],
-    help="")
-
-parser.add_argument('-gL', '--gapLim' , required=False, type=int, default = 15,
-    help="")
-parser.add_argument('-fL', '--fitLim' , required=False, type=float, default = 0.995,
-    help="")
-
-parser.add_argument('-l0', '--minLambda' , required=False, type=float, default = 300,
-    help="")
-
-parser.add_argument('-l1', '--maxLambda' , required=False, type=float, default = 800,
-    help="")
-
-parser.add_argument('-sseW' ,'--sseFitnesWeight', required=False, type=float, default = 1,
-    help="")
-
-parser.add_argument('-ssaW' ,'--ssaFitnesWeight', required=False, type=float, default = 1,
-    help="")
-
-#Optional Parameters
-parser.add_argument('-seed', '--seed', type = int, required=False, default=None,
-    help="Define a seed for the random number generator if desired.")
-
-
-kwargs = parser.parse_args().__dict__
+        populationDict["checkpoint"] = s
+        print(f"saving data checkpoint: {s}")
+        savemat(f"{outDir}/checkpoint/populationData.checkpoint.mat",populationDict)
+        savemat(f"{outDir}/checkpoint/entropyData.checkpoint.mat",{"dat":entropyStudy, "checkpoint":s})
 
 
+savemat(f"{outDir}/populationData.final.mat", populationDict)
+savemat(f"{outDir}/entropyData.final.mat", {"dat":entropyStudy})
 
-print(kwargs)
-
+for birthRate in range(nBirthRates):
+    bR = (birthRate + 1)/nBirthRates
+    s = np.var(entropyStudy[birthRate,:,:], axis=0)
+    m = np.mean(entropyStudy[birthRate,:,:], axis=0)
+    x = np.arange(nGenerations+1)
+    plt.plot(x, m, 'o-', label=f'Birth Rate: {bR}')
+    plt.fill_between(x, m-s, m+s, alpha = 0.2, zorder=-1)
+    plt.legend(loc='lower left')
+    plt.xlabel("Generations")
+    plt.ylabel("Entropy")
+plt.title("Entropy Decay During Evolutionary Algorithm")
+plt.savefig(f'{outDir}/Entropy-Decay-During-Evolutionary-Algorithm.png', dpi=300)
+plt.close()

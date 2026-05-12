@@ -234,11 +234,12 @@ else:
 for birthRate in range(nBirthRates):
     bR = (birthRate + 1)/nBirthRates
     bR = np.round(bR, 2)
-    s = np.var(entropyStudy[birthRate,:,:], axis=0)
+    s = np.std(entropyStudy[birthRate,:,:], axis=0)
     m = np.mean(entropyStudy[birthRate,:,:], axis=0)
     x = np.arange(nGenerations+1)
-    plt.plot(x, m, 'o-', label=f'Birth Rate: {bR}')
-    plt.fill_between(x, m-s, m+s, alpha = 0.2, zorder=-1)
+    #plt.plot(x, m, 'o-', label=f'Birth Rate: {bR}')
+    #plt.fill_between(x, m-s, m+s, alpha = 0.2, zorder=-1, color='maroon')
+    plt.errorbar(x,m, yerr=s, fmt='o-', markersize=4,capsize=2, label=f'Birth Rate: {bR}', alpha=0.5)
     plt.legend(loc='lower left')
     plt.xlabel("Generations")
     plt.ylabel("Entropy")
@@ -250,20 +251,23 @@ plt.close()
 for birthRate in range(nBirthRates):
     bR = (birthRate + 1)/nBirthRates
     bR = np.round(bR, 2)
-    print(fitnessStudy[birthRate,:,:,0])
-    print()
     m = np.mean(fitnessStudy[birthRate,:,:,3], axis=0)
-    s0 = np.max(fitnessStudy[birthRate,:,:,0], axis=0)
-    s1 = np.min(fitnessStudy[birthRate,:,:,1], axis=0)
+    s = np.std(fitnessStudy[birthRate,:,:,3], axis=0)
     x = np.arange(nGenerations+1)
-    print(s0)
-    plt.plot(x, m, 'o-', label=f'Birth Rate: {bR}')
-    plt.fill_between(x, s1, m, alpha = 0.2, zorder=-1, color='orangered')
-    plt.fill_between(x, m, s0, alpha = 0.2, zorder=-1, color='cornflowerblue')
-    plt.legend(loc='lower left')
+
+    #plt.plot(x, m, 'o-', label=f'Birth Rate: {bR}')
+    #plt.fill_between(x, m-s, m+s, alpha = 0.2, zorder=-1, color='maroon')
+    plt.errorbar(x,m, yerr=s, fmt='o-', markersize=4,capsize=2, label=f'Birth Rate: {bR}', alpha=0.5)
+    plt.legend(loc='upper left')
     plt.ylim((0,1))
     plt.xlabel("Generations")
     plt.ylabel("Average Fitness")
+temp0 = []
+temp1 = []
+for n in range(nGenerations+1):
+    temp0.append(np.max(fitnessStudy[:,:,n,0]))
+    temp1.append(np.min(fitnessStudy[:,:,n,1]))
+plt.fill_between(np.arange(nGenerations+1), temp0, temp1, alpha = 0.1, zorder=-3, color='black')
 plt.title("Evolution of Average Fitness")
 plt.savefig(f'{outDir}/Fitness-During-Evolutionary-Algorithm.png', dpi=300)
 plt.close()
